@@ -104,7 +104,7 @@ $ConfigName = "StudentBaseline"
 # =============================================================================
 # HELPER: create folders if missing
 # =============================================================================
-function Ensure-Folder {
+function New-FolderIfMissing {
     param([Parameter(Mandatory)][string]$Path)
     if (-not (Test-Path $Path)) {
         New-Item -ItemType Directory -Path $Path -Force | Out-Null
@@ -158,13 +158,13 @@ Write-Host "[*] You edit ONLY: DSC\Configurations\StudentConfig.ps1 and DSC\Data
 # =============================================================================
 # PHASE 0: EVIDENCE FOLDERS (ALWAYS CREATE)
 # =============================================================================
-Ensure-Folder -Path $OutputsRoot
-Ensure-Folder -Path $EvidenceRoot
-Ensure-Folder -Path (Join-Path $EvidenceRoot "Transcripts")
-Ensure-Folder -Path (Join-Path $EvidenceRoot "DSC")
-Ensure-Folder -Path (Join-Path $EvidenceRoot "Network")
-Ensure-Folder -Path (Join-Path $EvidenceRoot "AI_LOG")
-Ensure-Folder -Path (Join-Path $EvidenceRoot "Git\Reflog")
+New-FolderIfMissing -Path $OutputsRoot
+New-FolderIfMissing -Path $EvidenceRoot
+New-FolderIfMissing -Path (Join-Path $EvidenceRoot "Transcripts")
+New-FolderIfMissing -Path (Join-Path $EvidenceRoot "DSC")
+New-FolderIfMissing -Path (Join-Path $EvidenceRoot "Network")
+New-FolderIfMissing -Path (Join-Path $EvidenceRoot "AI_LOG")
+New-FolderIfMissing -Path (Join-Path $EvidenceRoot "Git\Reflog")
 
 # =============================================================================
 # PHASE 0: START TRANSCRIPT (EVIDENCE)
@@ -225,7 +225,7 @@ try {
 
     # 2.4 Compile output path (MOF generation destination)
     $CompileOut = Join-Path $OutputsRoot $ConfigName
-    Ensure-Folder -Path $CompileOut
+    New-FolderIfMissing -Path $CompileOut
 
     Write-Host "[*] Compiling -> DSC\Outputs\$ConfigName" -ForegroundColor Gray
 

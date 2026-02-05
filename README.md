@@ -9,15 +9,15 @@ If you follow the instructions in this file exactly, you will produce:
 
 ---
 
-## 0) The One-Rule Workflow
+## 0) The One-Rule to Workflow them all!
 
 You do **NOT** run a random set of commands.
 
-You run **one entry script**:
+There is only **one entry script** that You run...
 
 **Run_BuildMain.ps1**
 
-That script will (eventually) do everything in this order:
+That script will do everything in this order:
 1. Environment checks (admin, paths, folder structure)
 2. Prerequisites setup (tutor-provided)
 3. Compile + apply DSC configuration (your work)
@@ -27,7 +27,7 @@ If something fails, you fix the issue and run Run_BuildMain.ps1 again.
 
 ---
 
-## 1) What You Must Edit (and what you must NOT touch)
+## 1) What You Must Edit (and what you must absolutly NOT, like don't even think about editing!)
 
 You edit **ONLY** these two files:
 
@@ -61,7 +61,7 @@ If you use different passwords, you will break automation runs and support will 
 
 ### 2.4 Important: do not place passwords into your config/data files
 You must not hardcode passwords into StudentConfig.ps1 or AllNodes.psd1.
-The orchestrator will handle credentials (we will provide the mechanism).
+The orchestrator will handle credentials (I have provided the mechanism).
 
 For now (Week 1), you are allowed to use the fixed passwords manually if needed.
 Once the secrets mechanism is provided, you must use it.
@@ -125,7 +125,8 @@ From the repo root:
 ### Step B: Open PowerShell as Administrator
 You must run builds as Administrator.
 
-- Start Menu → PowerShell → Right-click → Run as Administrator
+- Start Menu → Terminal → Right-click → Run as Administrator
+- Make sure your starting terminal is Powershell 7 (pwsh) the dark blue icon
 - Then cd into your repo folder
 
 ### Step C: Run the orchestrator
@@ -192,7 +193,7 @@ Open:
 - DSC\Configurations\StudentConfig.ps1
 
 Week 1 goal:
-- Make a tiny, safe DSC resource work (e.g., create a folder, set a registry value).
+- Make a tiny, safe DSC resource work (e.g., create a folder).
 This proves you can compile/apply and generate outputs and evidence.
 
 Then you will expand toward AD DS, OUs, users, groups, and policy.

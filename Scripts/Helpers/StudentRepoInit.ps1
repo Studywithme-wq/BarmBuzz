@@ -167,10 +167,10 @@ If something fails, you fix the issue and run `Run_BuildMain.ps1` again.
 
 You edit **ONLY** these two files:
 
-1. `DSC\Configurations\StudentConfig.ps1`  
+1. `DSC\Configurations\StudentConfig.ps1`
    Your DSC configuration logic (the “what to build”)
 
-2. `DSC\Data\AllNodes.psd1`  
+2. `DSC\Data\AllNodes.psd1`
    Your configuration data (the “values for this environment”)
 
 Everything else in this repo is tutor-provided scaffolding or evidence structure.

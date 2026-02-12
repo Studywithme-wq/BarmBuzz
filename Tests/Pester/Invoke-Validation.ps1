@@ -38,15 +38,19 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Resolve-TestTargets {
-  param([string[]]$InputPaths)
+  param(
+    [string[]]$InputPaths,
+    [string]$ScriptRoot  # PESTER v5 FIX: Pass in $PSScriptRoot from script level
+                             # Inside functions, $MyInvocation doesn't have .Path property
+  )
 
-  $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-  $testsRoot = $here
+  $testsRoot = $ScriptRoot
   $testsRootNormalized = (Resolve-Path -Path $testsRoot).Path.TrimEnd('\') + '\'
 
   # Default: all tests under Tests\Pester, excluding this runner file itself.
   if (-not $InputPaths -or $InputPaths.Count -eq 0) {
-    $runnerName = Split-Path -Leaf $MyInvocation.MyCommand.Path
+    # PESTER v5 FIX: Hardcode the script name since $MyInvocation isn't available in functions
+    $runnerName = 'Invoke-Validation.ps1'
     $all = Get-ChildItem -Path $testsRoot -Recurse -File -Filter '*.Tests.ps1' |
       Where-Object { $_.Name -ne $runnerName } |
       Select-Object -ExpandProperty FullName
@@ -104,7 +108,9 @@ function Resolve-TestTargets {
     if (-not $seen.ContainsKey($t)) { $seen[$t] = $true; $t }
   }
 
-  return $deduped
+  # PESTER v5 FIX: Wrap in @() to ensure it's always an array (even with 1 item)
+  # Otherwise .Count property won't exist and script will fail
+  return @($deduped)
 }
 
 # Locate repo root by walking up until we see Run_BuildMain.ps1 (your repo contract).
@@ -122,7 +128,8 @@ function Find-RepoRoot {
 }
 
 $repoRoot = Find-RepoRoot
-$testFiles = Resolve-TestTargets -InputPaths $Paths
+# PESTER v5 FIX: Cast to [array] so .Count property always works (even with single item)
+[array]$testFiles = Resolve-TestTargets -InputPaths $Paths -ScriptRoot $PSScriptRoot
 
 Write-Host "Pester runner:"
 Write-Host "  Repo root:  $repoRoot"
@@ -145,7 +152,8 @@ $cfg.Run.Exit = $true  # non-zero exit code on failures (useful in automation)
 if (-not $NoResultFile) {
   $cfg.TestResult.Enabled = $true
   $cfg.TestResult.OutputPath = $resultPath
-  $cfg.TestResult.Format = 'NUnitXml'
+  # PESTER v5 FIX: Property is 'OutputFormat' not 'Format'
+  $cfg.TestResult.OutputFormat = 'NUnitXml'
   Write-Host "  Results:    $resultPath"
 } else {
   Write-Host "  Results:    disabled"

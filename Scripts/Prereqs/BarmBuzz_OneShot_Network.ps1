@@ -79,7 +79,7 @@ Catch {
 # ---------------------------------------------------------------------------
 # 5. RSAT INSTALL (AD + GPO tooling) with OS detection via WinPS (5.1)
 # ---------------------------------------------------------------------------
-Write-Host "`n[*] Ensuring RSAT tools (AD + GPO) are installed..." -ForegroundColor Yellow
+# STUDENT NOTE: RSAT modules (ActiveDirectory, GroupPolicy) are NOT from PSGallery!\n# They're Windows Features (Server) or Windows Capabilities (Client)\n# Different Windows versions need different installation methods:\n#   - Windows 10/11 Client: Add-WindowsCapability\n#   - Windows Server: Install-WindowsFeature\n# These modules install into system32, not Program Files\\WindowsPowerShell\\Modules\nWrite-Host \"`n[*] Ensuring RSAT tools (AD + GPO) are installed...\" -ForegroundColor Yellow
 
 function Invoke-WinPSCommand {
     param([Parameter(Mandatory)][string]$Script)
@@ -100,15 +100,7 @@ function Invoke-WinPSCommand {
 }
 
 $osProductType = (Get-CimInstance Win32_OperatingSystem).ProductType  # 1=Client, 2=Domain Controller, 3=Server
-if ($osProductType -eq 1) {
-    # Windows Client: use Windows Capabilities
-    $clientScript = @'
-Try {
-    Add-WindowsCapability -Online -Name RSAT.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0 -ErrorAction Stop | Out-Null
-    Add-WindowsCapability -Online -Name Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0 -ErrorAction Stop | Out-Null
-    Write-Output ''RSAT capabilities installed (client).''
-} Catch { Write-Error $_ }
-'@
+if ($osProductType -eq 1) {\n    # Windows Client: use Windows Capabilities\n    # STUDENT NOTE: Windows 10/11 RSAT tools are \"capabilities\" not \"features\"\n    # The specific capability names include version identifiers (~~~~0.0.1.0)\n    $clientScript = @'\nTry {\n    Add-WindowsCapability -Online -Name RSAT.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0 -ErrorAction Stop | Out-Null\n    Add-WindowsCapability -Online -Name Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0 -ErrorAction Stop | Out-Null\n    Write-Output 'RSAT capabilities installed (client).'\n} Catch { Write-Error $_ }\n'@
     $r = Invoke-WinPSCommand -Script $clientScript
     if ($r.ExitCode -ne 0) {
         Write-Warning "RSAT install (client) may have failed. StdErr: $($r.StdErr)"
@@ -116,16 +108,7 @@ Try {
         Write-Host "    [+] RSAT (client) processed." -ForegroundColor Green
     }
 }
-else {
-    # Windows Server: use Windows Features
-    $serverScript = @'
-Try {
-    Import-Module ServerManager -ErrorAction Stop
-    Install-WindowsFeature RSAT-AD-PowerShell -ErrorAction Stop | Out-Null
-    Install-WindowsFeature GPMC -ErrorAction Stop | Out-Null
-    Write-Output ''RSAT features installed (server).''
-} Catch { Write-Error $_ }
-'@
+else {\n    # Windows Server: use Windows Features\n    # STUDENT NOTE: Server uses Install-WindowsFeature instead of Add-WindowsCapability\n    # Feature names are simpler: RSAT-AD-PowerShell and GPMC\n    $serverScript = @'\nTry {\n    Import-Module ServerManager -ErrorAction Stop\n    Install-WindowsFeature RSAT-AD-PowerShell -ErrorAction Stop | Out-Null\n    Install-WindowsFeature GPMC -ErrorAction Stop | Out-Null\n    Write-Output 'RSAT features installed (server).'\n} Catch { Write-Error $_ }\n'@
     $r = Invoke-WinPSCommand -Script $serverScript
     if ($r.ExitCode -ne 0) {
         Write-Warning "RSAT install (server) may have failed. StdErr: $($r.StdErr)"

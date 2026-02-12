@@ -35,12 +35,12 @@ These check that the configuration actually achieved the intended state AFTER th
 
 - Pester tests live in: `Tests\Pester\`
 - Test files **must** end with: `.Tests.ps1` (Pester convention)
-- Test runner: `Invoke-Validation.ps1` (our test harness)
+- Test runner: `Invoke-Validation.ps1` (our test harness - **YOU DON'T EDIT THIS!**)
 
 **Structure:**
 ```
 Tests\Pester\
-├── Invoke-Validation.ps1       ← Test runner (USE THIS!)
+├── Invoke-Validation.ps1       ← Test runner (runs all tests, injects data)
 ├── Preflight-Environment.Tests.ps1
 ├── Test-ProofOfLife.Tests.ps1
 └── README.md                   ← You are here
@@ -67,21 +67,24 @@ Use the test harness to run all tests in one go:
 ```
 
 **What happens:**
-- Discovers all `*.Tests.ps1` files in `Tests\Pester\`
+- Discovers all `*.Tests.ps1` files in `Tests\Pester\` automatically
+- **Injects `$RepoRoot` and `$EvidenceDir` into your test files** (you don't calculate paths!)
 - Runs them with detailed output
-- Creates an XML result file in `Evidence\Pester\`
-- Returns exit code 0 (success) or 1 (failure)
+- Creates an XML result file in `Evidence\Pester\PesterResults_TIMESTAMP.xml`
+- Returns exit code 0 (success) or 1 (failure) for automation
 
 ### 3.3 Run Specific Tests
 Run one or more specific test files:
 
 ```powershell
 # Run just the preflight tests
-.\Tests\Pester\Invoke-Validation.ps1 .\Tests\Pester\Preflight-Environment.Tests.ps1
+.\Tests\Pester\Invoke-Validation.ps1 Preflight-Environment.Tests.ps1
 
-# Run multiple specific tests
-.\Tests\Pester\Invoke-Validation.ps1 .\Tests\Pester\Preflight-Environment.Tests.ps1 .\Tests\Pester\Test-ProofOfLife.Tests.ps1
+# Run multiple specific tests (space-separated)
+.\Tests\Pester\Invoke-Validation.ps1 Preflight*.Tests.ps1 Test-ProofOfLife.Tests.ps1
 ```
+
+**TIP:** You can use wildcards (`*`) to match multiple test files!
 
 ### 3.4 Run Tests Without Result Files
 Skip creating XML result files (useful during development):
@@ -94,10 +97,11 @@ Skip creating XML result files (useful during development):
 Control how much detail you see:
 
 ```powershell
-# Less detail (default: Detailed)
+# Less detail (just pass/fail summary)
 .\Tests\Pester\Invoke-Validation.ps1 -Output Normal
 
 # Maximum detail (for debugging)
+.\Tests\Pester\Invoke-Validation.ps1 -Output Diagnostic
 .\Tests\Pester\Invoke-Validation.ps1 -Output Diagnostic
 ```
 
@@ -179,32 +183,65 @@ git push
 
 **⚠️ Only do this if explicitly instructed by your tutor.**
 
-### 6.1 Pester v5 Basics
-Pester v5 uses a structured syntax with `Describe`, `Context`, and `It` blocks.
+If you need to write custom tests, the test harness makes it easy by automatically providing `$RepoRoot` and `$EvidenceDir`.
 
-**Simple Example:**
+### 6.1 The Magic: Automatic Data Injection
+
+**YOU GET FOR FREE:**
+- `$RepoRoot` - Path to repo root (where `Run_BuildMain.ps1` lives)
+- `$EvidenceDir` - Path to `Evidence\Pester` folder
+
+**How it works:**
+1. The test harness (`Invoke-Validation.ps1`) calculates these paths
+2. It injects them into your test files via Pester's container mechanism
+3. Your test receives them via `param($RepoRoot, $EvidenceDir)` in `BeforeAll`
+
+**You NEVER need to:**
+- Walk up directories looking for the repo root
+- Calculate paths manually
+- Worry about where your test file is located
+
+### 6.2 Simple Test Example
 ```powershell
 # MyTest.Tests.ps1
 Describe "My Custom Validation" {
+    
+    BeforeAll {
+        # RECEIVE the injected data
+        param($RepoRoot, $EvidenceDir)
+        
+        # Store in script scope for use in tests
+        $script:repoRoot = $RepoRoot
+        $script:evidenceDir = $EvidenceDir
+    }
     
     It "Should find the test file" {
         Test-Path "C:\TEST\test.txt" | Should -BeTrue
     }
     
-    It "Should have correct content" {
-        $content = Get-Content "C:\TEST\test.txt" -Raw
-        $content | Should -Match "BarmBuzz"
+    It "Repo root was injected correctly" {
+        $script:repoRoot | Should -Not -BeNullOrEmpty
+        Test-Path (Join-Path $script:repoRoot "Run_BuildMain.ps1") | Should -BeTrue
     }
 }
 ```
 
-### 6.2 Test Structure (Pester v5)
+### 6.3 Advanced Test Structure (Pester v5)
 ```powershell
 # MyAdvanced.Tests.ps1
 
 Describe "My Advanced Test Suite" {
     
-    # BeforeAll runs ONCE before all tests (setup)
+    # BeforeDiscovery runs BEFORE Pester discovers tests (for dynamic test generation)
+    BeforeDiscovery {
+        # RECEIVE injected data here too if you need it during discovery
+        param($RepoRoot, $EvidenceDir)
+        
+        # Example: Generate tests dynamically based on repo contents
+        $script:ConfigFiles = Get-ChildItem "$RepoRoot\DSC\Configurations\*.ps1"
+    }
+    
+    # BeforeAll runs ONCE before all tests execute (setup phase)
     BeforeAll {
         # IMPORTANT: The test harness automatically injects these for you!
         param(
@@ -254,12 +291,13 @@ Describe "My Advanced Test Suite" {
 ```
 
 **KEY POINTS:**
-- **`param($RepoRoot, $EvidenceDir)`** in `BeforeAll` receives injected values from the harness
-- **You don't need to calculate repo paths yourself** - they're provided automatically
-- **Legacy support:** If you run the test file directly (not via harness), you'll need fallback logic
+- **`param($RepoRoot, $EvidenceDir)`** in both `BeforeDiscovery` and `BeforeAll` receives injected values
+- **You don't need to calculate repo paths yourself** - the harness does it for you
 - **`$script:` scope** makes variables available to all tests in the file
+- **BeforeDiscovery** is for test generation (dynamic tests based on file lists, etc.)
+- **BeforeAll** is for setup that runs before tests execute
 
-### 6.3 Common Pester Assertions
+### 6.4 Common Pester Assertions
 ```powershell
 # Equality
 $value | Should -Be "expected"
@@ -289,21 +327,25 @@ $array | Should -Contain "item"
 $array | Should -HaveCount 5
 ```
 
-### 6.4 Running Your Custom Test
+### 6.5 Running Your Custom Test
 Once you've created `MyTest.Tests.ps1` in `Tests\Pester\`:
 
 ```powershell
-# Our test harness will find it automatically
+# Our test harness will find it automatically and inject data
 .\Tests\Pester\Invoke-Validation.ps1
 
-# Or run it directly
-.\Tests\Pester\Invoke-Validation.ps1 .\Tests\Pester\MyTest.Tests.ps1
+# Or run just your specific test
+.\Tests\Pester\Invoke-Validation.ps1 MyTest.Tests.ps1
 ```
 
-### 6.5 Best Practices for Test Writing
+**REMEMBER:** The harness automatically injects `$RepoRoot` and `$EvidenceDir` - you just receive them!
+
+### 6.6 Best Practices for Test Writing
 
 **DO:**
 - ✅ Name files with `.Tests.ps1` suffix
+- ✅ Use `param($RepoRoot, $EvidenceDir)` in `BeforeAll` to receive injected data
+- ✅ Store received params in `$script:` scope for test access
 - ✅ Use descriptive test names (the `It` string)
 - ✅ Group related tests in `Context` blocks
 - ✅ Use `BeforeAll` for setup that runs once
@@ -311,6 +353,7 @@ Once you've created `MyTest.Tests.ps1` in `Tests\Pester\`:
 - ✅ Include helpful error messages
 
 **DON'T:**
+- ❌ Try to calculate `$RepoRoot` yourself - it's injected for you!
 - ❌ Modify system state in tests (tests should be read-only)
 - ❌ Depend on test execution order
 - ❌ Use external dependencies unless necessary
@@ -321,6 +364,14 @@ Once you've created `MyTest.Tests.ps1` in `Tests\Pester\`:
 Describe "Domain Controller Validation" {
     
     BeforeAll {
+        # RECEIVE injected data from harness
+        param($RepoRoot, $EvidenceDir)
+        
+        # Store in script scope
+        $script:repoRoot = $RepoRoot
+        $script:evidenceDir = $EvidenceDir
+        
+        # Your test variables
         $script:DCName = "DC01"
         $script:DomainName = "barmbuzz.local"
     }

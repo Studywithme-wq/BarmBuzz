@@ -25,7 +25,16 @@ Describe "Hello World Test" {
     }
 
     It "2 + 2 should equal 4" {
-        (2 + 2) | Should -Be 4
+        (2 + 2) | Should -Be 4 -Because @"
+This is a smoke test to verify Pester is working correctly.
+If this fails, something is seriously wrong with your PowerShell installation!
+
+HINT: If you see this error, try:
+  1. Close PowerShell
+  2. Restart PowerShell as Administrator
+  3. Run: Install-Module Pester -Force -SkipPublisherCheck
+  4. Re-run tests
+"@
     }
 
 }

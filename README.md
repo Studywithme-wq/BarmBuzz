@@ -223,15 +223,95 @@ Higher grades add extra architecture and security sophistication, but a pass is 
 
 ---
 
-## 8) Where to Start Right Now
+## 8) Testing Infrastructure (Pester)
+
+### 8.1 Test Harness Overview
+This repository includes a Pester test harness for validation and evidence collection.
+
+**Test Runner:**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1
+```
+
+This discovers and runs all `*.Tests.ps1` files in `Tests\Pester\` and automatically:
+- Injects `$RepoRoot` and `$EvidenceDir` into your tests
+- Saves XML results to `Evidence\Pester\PesterResults_*.xml`
+- Provides detailed output for debugging
+
+### 8.2 Running Tests
+
+**Run all tests:**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1
+```
+
+**Run specific test file:**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1 PreDCPromo.Tests.ps1
+```
+
+**Run with less verbose output:**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1 -Output Normal
+```
+
+**Run without saving XML (development):**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1 -NoResultFile
+```
+
+### 8.3 Available Tests
+
+- **Preflight-Environment.Tests.ps1** - Validates PowerShell environment, modules, and tooling
+- **Test-ProofOfLife.Tests.ps1** - Verifies DSC can create basic resources
+- **PreDCPromo.Tests.ps1** - Pre-DC promotion network and feature readiness checks
+- **Baseline.Tests.ps1** - Server baseline validation
+- **Template.Tests.ps1** - Example test patterns you can copy
+- **Hello.Tests.ps1** - Minimal smoke test
+
+### 8.4 Writing Your Own Tests
+
+Test files automatically receive `$RepoRoot` and `$EvidenceDir` parameters.
+
+**Basic template:**
+```powershell
+BeforeAll {
+  param($RepoRoot, $EvidenceDir)
+  
+  # Load your config
+  $cfg = Import-PowerShellDataFile (Join-Path $RepoRoot 'DSC\Data\AllNodes.psd1')
+  
+  # Test setup
+}
+
+Describe "My Tests" {
+  It "Should do something" {
+    $true | Should -Be $true
+  }
+}
+```
+
+See `Tests\Pester\Template.Tests.ps1` for comprehensive examples.
+
+### 8.5 Test Results and Evidence
+
+Results are saved as NUnit XML format in `Evidence\Pester\`:
+- Timestamped for each run
+- Industry-standard format (CI/CD compatible)
+- Commit these to Git as proof of validation
+
+---
+
+## 9) Where to Start Right Now
 
 Open:
 - DSC\Data\AllNodes.psd1
 - DSC\Configurations\StudentConfig.ps1
 
 Week 1 goal:
-- Make a tiny, safe DSC resource work (e.g., create a folder).
-This proves you can compile/apply and generate outputs and evidence.
+- Make a tiny, safe DSC resource work (e.g., create a folder)
+- Run `.\Tests\Pester\Invoke-Validation.ps1` to verify
+- This proves you can compile/apply and generate outputs and evidence
 
 Then you will expand toward AD DS, OUs, users, groups, and policy.
 

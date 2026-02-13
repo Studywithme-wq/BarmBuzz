@@ -6,6 +6,25 @@ $ErrorActionPreference = 'Stop'
 
 Describe "Proof-of-Life (DSC created files)" {
 
+    BeforeAll {
+        # REQUIRED: Accept injected parameters from the test harness
+        param($RepoRoot, $EvidenceDir)
+
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        # Fallback: If not injected by harness, calculate from test file location
+        if (-not $RepoRoot) {
+            $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        }
+        if (-not $EvidenceDir) {
+            $EvidenceDir = (Resolve-Path (Join-Path $RepoRoot 'Evidence/Pester')).Path
+        }
+
+        # You can use $RepoRoot or $EvidenceDir here if needed
+        # For now, this test just checks hardcoded paths
+    }
+
     It "C:\\TEST directory exists" {
         Test-Path 'C:\\TEST' | Should -BeTrue
     }

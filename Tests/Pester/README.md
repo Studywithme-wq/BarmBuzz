@@ -187,7 +187,29 @@ git push
 
 If you need to write custom tests, the test harness makes it easy by automatically providing `$RepoRoot` and `$EvidenceDir`.
 
-### 6.1 The Magic: Automatic Data Injection
+### 6.1 Quick Start: Use the Template
+
+**The easiest way to create a new test:**
+
+1. Copy the template:
+   ```powershell
+   Copy-Item .\Tests\Pester\Template.Tests.ps1 .\Tests\Pester\MyTest.Tests.ps1
+   ```
+
+2. Edit your new test file and replace the examples with your tests
+
+3. Run it:
+   ```powershell
+   .\Tests\Pester\Invoke-Validation.ps1 MyTest.Tests.ps1
+   ```
+
+**See [Template.Tests.ps1](Template.Tests.ps1) for:**
+- Complete examples of simple and dynamic tests
+- Common testing patterns (files, services, networks, etc.)
+- List of all common `Should` assertions
+- Detailed comments explaining each pattern
+
+### 6.2 The Magic: Automatic Data Injection (with Fallback)
 
 **YOU GET FOR FREE:**
 - `$RepoRoot` - Path to repo root (where `Run_BuildMain.ps1` lives)
@@ -195,26 +217,112 @@ If you need to write custom tests, the test harness makes it easy by automatical
 
 **How it works:**
 1. The test harness (`Invoke-Validation.ps1`) calculates these paths
-2. It injects them into your test files via Pester's container mechanism
+2. It attempts to inject them into your test files via Pester's container mechanism
 3. Your test receives them via `param($RepoRoot, $EvidenceDir)` in `BeforeAll`
+4. **Fallback**: If injection fails (due to Pester limitations), tests calculate paths themselves
 
 **You NEVER need to:**
-- Walk up directories looking for the repo root
-- Calculate paths manually
-- Worry about where your test file is located
+- Manually walk up directories to find the repo root in your test logic
+- Worry about where your test file is located when using paths
+- Write complex path resolution code
 
-### 6.2 Simple Test Example
+**The fallback pattern ensures tests work:**
+- When run through the harness (`.\Tests\Pester\Invoke-Validation.ps1`)
+- When run directly with Invoke-Pester
+- When run in different PowerShell versions
+- Even if Pester's data injection mechanism changes
+
+### 6.3 CRITICAL: The Correct Parameter Pattern
+
+**Every test file MUST include this in `BeforeAll`:**
+
+```powershell
+Describe "Your Test Suite" {
+    
+    BeforeAll {
+        # REQUIRED: Accept injected parameters from the test harness
+        param($RepoRoot, $EvidenceDir)
+        
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        
+        # IMPORTANT: Fallback for when injection doesn't work
+        # This makes tests robust - they work through harness OR standalone
+        if (-not $RepoRoot) {
+            $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        }
+        if (-not $EvidenceDir) {
+            $EvidenceDir = (Resolve-Path (Join-Path $RepoRoot 'Evidence/Pester')).Path
+        }
+        
+        # Now you can use $RepoRoot to load config files
+        $config = Import-PowerShellDataFile (Join-Path $RepoRoot 'DSC\Data\AllNodes.psd1')
+    }
+    
+    It "Your test here" {
+        # Test code
+    }
+}
+```
+
+**If you need dynamic test generation, add `BeforeDiscovery` too:**
+
+```powershell
+Describe "Your Test Suite" {
+    
+    BeforeDiscovery {
+        # REQUIRED: Accept parameters for discovery phase
+        param($RepoRoot, $EvidenceDir)
+        
+        # IMPORTANT: Fallback logic
+        if (-not $RepoRoot) {
+            $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        }
+        
+        # Generate test data (e.g., list of modules to check)
+        $script:RequiredModules = @('Pester', 'ActiveDirectoryDsc')
+    }
+    
+    BeforeAll {
+        # REQUIRED: Accept parameters for execution phase
+        param($RepoRoot, $EvidenceDir)
+        
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        
+        # IMPORTANT: Fallback logic
+        if (-not $RepoRoot) {
+            $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        }
+        if (-not $EvidenceDir) {
+            $EvidenceDir = (Resolve-Path (Join-Path $RepoRoot 'Evidence/Pester')).Path
+        }
+    }
+    
+    # Create one test for each module
+    It "Module '<_>' is installed" -ForEach $RequiredModules {
+        Get-Module -ListAvailable -Name $_ | Should -Not -BeNullOrEmpty
+    }
+}
+```
+
+**Why the fallback pattern?**
+- Pester 5's `-Data` parameter injection doesn't always work reliably
+- The fallback ensures tests work in all scenarios
+- Students can run tests directly with `Invoke-Pester` for debugging
+- Makes the testing framework more resilient to Pester version changes
+
+### 6.4 Simple Test Example
 ```powershell
 # MyTest.Tests.ps1
 Describe "My Custom Validation" {
     
     BeforeAll {
-        # RECEIVE the injected data
+        # REQUIRED: Accept injected parameters
         param($RepoRoot, $EvidenceDir)
         
-        # Store in script scope for use in tests
-        $script:repoRoot = $RepoRoot
-        $script:evidenceDir = $EvidenceDir
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
     }
     
     It "Should find the test file" {
@@ -222,13 +330,79 @@ Describe "My Custom Validation" {
     }
     
     It "Repo root was injected correctly" {
-        $script:repoRoot | Should -Not -BeNullOrEmpty
-        Test-Path (Join-Path $script:repoRoot "Run_BuildMain.ps1") | Should -BeTrue
+        $RepoRoot | Should -Not -BeNullOrEmpty
+        Test-Path (Join-Path $RepoRoot "Run_BuildMain.ps1") | Should -BeTrue
     }
 }
 ```
 
-### 6.3 Advanced Test Structure (Pester v5)
+**For more examples, see [Template.Tests.ps1](Template.Tests.ps1)**
+
+### 6.5 Test File Naming Rules
+
+1. **MUST end with `.Tests.ps1`** (Pester convention)
+   - ✅ `MyFeature.Tests.ps1`
+   - ✅ `Validate-Network.Tests.ps1`
+   - ❌ `MyTest.ps1` (missing .Tests)
+   - ❌ `Test-MyFeature.ps1` (wrong order)
+
+2. **Must be in `Tests\Pester\` folder** (for automatic discovery)
+
+3. **Invoke-Validation.ps1 is special** (it's the test runner, not a test itself)
+
+### 6.6 What NOT to Do ❌
+
+**Don't forget the fallback logic:**
+```powershell
+# ❌ BAD: No fallback means tests only work through harness
+BeforeAll {
+    param($RepoRoot, $EvidenceDir)
+    # Missing: if (-not $RepoRoot) { ... }
+    $config = Import-PowerShellDataFile (Join-Path $RepoRoot 'DSC\Data\AllNodes.psd1')
+}
+
+# ✅ GOOD: Fallback makes tests robust
+BeforeAll {
+    param($RepoRoot, $EvidenceDir)
+    if (-not $RepoRoot) {
+        $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+    }
+    $config = Import-PowerShellDataFile (Join-Path $RepoRoot 'DSC\Data\AllNodes.psd1')
+}
+```
+
+**Don't put param() in the wrong place:**
+```powershell
+# ❌ BAD: param() inside Describe block (wrong!)
+Describe "My Test" {
+    param($RepoRoot, $EvidenceDir)  # ❌ WRONG LOCATION
+    
+    It "Test" { }
+}
+
+# ✅ GOOD: param() inside BeforeAll block
+Describe "My Test" {
+    BeforeAll {
+        param($RepoRoot, $EvidenceDir)  # ✅ CORRECT LOCATION
+        if (-not $RepoRoot) {
+            $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+        }
+    }
+    
+    It "Test" { }
+}
+```
+
+**Don't run Invoke-Pester directly on test files (unless debugging):**
+```powershell
+# ⚠️ WORKS: But doesn't use harness features (result file naming, etc.)
+Invoke-Pester .\Tests\Pester\MyTest.Tests.ps1
+
+# ✅ BETTER: Always use the harness for normal test runs
+.\Tests\Pester\Invoke-Validation.ps1 MyTest.Tests.ps1
+```
+
+### 6.7 Advanced Test Structure (Pester v5)
 ```powershell
 # MyAdvanced.Tests.ps1
 

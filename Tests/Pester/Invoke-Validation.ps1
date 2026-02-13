@@ -158,10 +158,11 @@ $resultPath = Join-Path -Path $evidenceDir -ChildPath "PesterResults_$timestamp.
 # Your test files receive $RepoRoot and $EvidenceDir via param() in BeforeAll/BeforeDiscovery
 # This means you NEVER need to calculate repo paths yourself!
 $containers = foreach ($tf in $testFiles) {
-  New-PesterContainer -Path $tf -Data @{
-    RepoRoot    = $repoRoot      # Injected into your tests
-    EvidenceDir = $evidenceDir   # Injected into your tests
+  $data = @{
+    RepoRoot    = [string]$repoRoot      # Injected into your tests
+    EvidenceDir = [string]$evidenceDir   # Injected into your tests
   }
+  New-PesterContainer -Path $tf -Data $data
 }
 
 # Build Pester configuration (Pester v5 uses configuration objects)

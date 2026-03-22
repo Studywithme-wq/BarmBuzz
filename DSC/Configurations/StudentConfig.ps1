@@ -3,62 +3,29 @@ STUDENT TASK:
 - Define Configuration StudentBaseline
 - Use ConfigurationData (AllNodes.psd1)
 - DO NOT hardcode passwords here.
-
-CYBERSECURITY NOTES:
-This is a Security module. Credential handling matters even in labs.
-
-WHY NO HARDCODED CREDENTIALS?
-1. Security Hygiene: Hardcoded credentials in code = security breach waiting to happen
-2. Git History: Once committed, credentials are in your Git history FOREVER (even if you delete them later)
-3. Professional Practice: Real environments use credential vaults (Azure KeyVault, HashiCorp Vault, etc.)
-4. Audit Trail: Your Git commits may be reviewed by employers, peers, or examiners
-
-HOW CREDENTIALS WILL WORK (Later weeks):
-- The orchestrator (Run_BuildMain.ps1) will handle credential creation securely
-- Your configuration receives them as PSCredential objects via parameters
-- Example: Configuration StudentBaseline { param([PSCredential]$DomainCredential) }
-- You reference them in DSC resources without seeing the plaintext password
-- MOFs can be encrypted with certificates (production best practice)
-
-FOR NOW (Week 1):
-- Lab uses FIXED credentials documented in StudentRepoInit.ps1
-- Administrator password: superw1n_user (Windows local admin)
-- User accounts password: notlob2k26 (domain users you create)
-- You may need these for MANUAL tasks, but NEVER put them in this file
-
-THREAT MODEL AWARENESS:
-Even in a lab, practice defense-in-depth:
-- Assume your repo will be cloned by others (it will - it's Git!)
-- Assume your transcripts/logs will be read (they're in Evidence/)
-- Assume your build artifacts will be inspected (they're committed)
-- NEVER commit: passwords, API keys, personal data, PII
-
-If you accidentally commit a secret:
-1. Rotating the secret is the ONLY fix (changing the password)
-2. Deleting the file or "fixing" the commit does NOT remove it from Git history
-3. Tools like git-secrets, TruffleHog, and GitGuardian scan for exposed secrets
-
-This is not paranoia - this is professional discipline.
 #>
 
 Configuration StudentBaseline {
-    param()
+    param(
+        [PSCredential]$DomainAdminCredential,
+        [PSCredential]$DsrmCredential,
+        [PSCredential]$UserCredential
+    )
 
     Import-DscResource -ModuleName PSDesiredStateConfiguration
     Import-DscResource -ModuleName ComputerManagementDSC
-    #Import-DscResource -ModuleName ActivedirectoryDSC
-
+    Import-DscResource -ModuleName ActiveDirectoryDsc
+    Import-DscResource -ModuleName GroupPolicyDsc
 
     Node $AllNodes.NodeName {
-
-        # Ensure C:\TEST exists
+        
+        # Proof-of-life
         File TestFolder {
             DestinationPath = 'C:\TEST'
             Type            = 'Directory'
             Ensure          = 'Present'
         }
 
-        # Ensure C:\TEST\test.txt exists with content
         File TestFile {
             DestinationPath = 'C:\TEST\test.txt'
             Type            = 'File'
@@ -67,5 +34,108 @@ Configuration StudentBaseline {
             DependsOn       = '[File]TestFolder'
         }
 
+        # 1. Root Domain
+        ADDomain BoltonDomain {
+            DomainName                = $Node.DomainName
+            IsSingleInstance          = 'Yes'
+            DomainAdministratorCredential = $DomainAdminCredential
+            SafemodeAdministratorPassword = $DsrmCredential
+        }
+
+        # 2. OU Structure
+        ADOrganizationalUnit OU_Users {
+            Name      = 'Users'
+            Path      = "DC=bolton,DC=barmbuzz,DC=test"
+            DependsOn = '[ADDomain]BoltonDomain'
+        }
+        
+        ADOrganizationalUnit OU_Computers {
+            Name      = 'Computers'
+            Path      = "DC=bolton,DC=barmbuzz,DC=test"
+            DependsOn = '[ADDomain]BoltonDomain'
+        }
+
+        ADOrganizationalUnit OU_ITAdmins {
+            Name      = 'IT-Admins'
+            Path      = "DC=bolton,DC=barmbuzz,DC=test"
+            DependsOn = '[ADDomain]BoltonDomain'
+        }
+
+        ADOrganizationalUnit OU_Derby {
+            Name      = 'Derby'
+            Path      = "DC=bolton,DC=barmbuzz,DC=test"
+            DependsOn = '[ADDomain]BoltonDomain'
+        }
+
+        ADOrganizationalUnit OU_Nottingham {
+            Name      = 'Nottingham'
+            Path      = "OU=Derby,DC=bolton,DC=barmbuzz,DC=test"
+            DependsOn = '[ADOrganizationalUnit]OU_Derby'
+        }
+
+        # 3. RBAC Groups
+        ADGroup GG_Staff {
+            GroupName  = 'GG-Staff'
+            Path       = "OU=Users,DC=bolton,DC=barmbuzz,DC=test"
+            Category   = 'Security'
+            GroupScope = 'Global'
+            DependsOn  = '[ADOrganizationalUnit]OU_Users'
+        }
+
+        ADGroup GG_ITAdmins {
+            GroupName  = 'GG-IT-Admins'
+            Path       = "OU=IT-Admins,DC=bolton,DC=barmbuzz,DC=test"
+            Category   = 'Security'
+            GroupScope = 'Global'
+            DependsOn  = '[ADOrganizationalUnit]OU_ITAdmins'
+        }
+
+        # 4. Identity Baseline (Users)
+        ADUser User_JohnDoe {
+            UserName    = 'JohnDoe'
+            Path        = "OU=Users,DC=bolton,DC=barmbuzz,DC=test"
+            Password    = $UserCredential
+            DependsOn   = '[ADOrganizationalUnit]OU_Users'
+        }
+
+        ADGroupMember Member_JohnDoe {
+            GroupName = 'GG-Staff'
+            Members   = 'JohnDoe'
+            DependsOn = @('[ADGroup]GG_Staff', '[ADUser]User_JohnDoe')
+        }
+
+        ADUser User_AdminJane {
+            UserName    = 'AdminJane'
+            Path        = "OU=IT-Admins,DC=bolton,DC=barmbuzz,DC=test"
+            Password    = $UserCredential
+            DependsOn   = '[ADOrganizationalUnit]OU_ITAdmins'
+        }
+
+        ADGroupMember Member_AdminJane {
+            GroupName = 'GG-IT-Admins'
+            Members   = 'AdminJane'
+            DependsOn = @('[ADGroup]GG_ITAdmins', '[ADUser]User_AdminJane')
+        }
+
+        # 5. Security Policies (A* FGPP Requirements)
+        ADFineGrainedPasswordPolicy PwdPolicyAdmins {
+            Name               = 'FGPP-ITAdmins'
+            Precedence         = 10
+            ComplexityEnabled  = $true
+            MinPasswordLength  = 15
+            MaxPasswordAge     = '30.00:00:00'
+            MinPasswordAge     = '1.00:00:00'
+            PasswordHistoryCount = 24
+            LockoutDuration    = '00:30:00'
+            LockoutObservationWindow = '00:15:00'
+            LockoutThreshold   = 3
+            DependsOn          = '[ADDomain]BoltonDomain'
+        }
+
+        ADFineGrainedPasswordPolicySubject PwdPolicyAdminsSubject {
+            PolicyName = 'FGPP-ITAdmins'
+            Subjects   = 'GG-IT-Admins'
+            DependsOn  = @('[ADFineGrainedPasswordPolicy]PwdPolicyAdmins', '[ADGroup]GG_ITAdmins')
+        }
     }
 }

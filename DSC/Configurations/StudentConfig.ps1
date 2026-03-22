@@ -177,56 +177,56 @@ Configuration StudentBaseline {
             UserName = 'j.smith'; GivenName = 'John'; Surname = 'Smith'; DisplayName = 'John Smith'
             Department = 'IT'; JobTitle = 'Systems Engineer'
             Path = "OU=BoltonUsers,OU=Bolton,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_BoltonUsers'
         }
         ADUser User_ajones {
             UserName = 'a.jones'; GivenName = 'Alice'; Surname = 'Jones'; DisplayName = 'Alice Jones'
             Department = 'Finance'; JobTitle = 'Finance Analyst'
             Path = "OU=BoltonUsers,OU=Bolton,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_BoltonUsers'
         }
         ADUser User_btaylor {
             UserName = 'b.taylor'; GivenName = 'Bob'; Surname = 'Taylor'; DisplayName = 'Bob Taylor'
             Department = 'HR'; JobTitle = 'HR Manager'
             Path = "OU=BoltonUsers,OU=Bolton,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_BoltonUsers'
         }
         ADUser User_dpatel {
             UserName = 'd.patel'; GivenName = 'Dev'; Surname = 'Patel'; DisplayName = 'Dev Patel'
             Department = 'IT'; JobTitle = 'Derby IT Technician'
             Path = "OU=DerbyUsers,OU=Derby,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_DerbyUsers'
         }
         ADUser User_sgreen {
             UserName = 's.green'; GivenName = 'Sara'; Surname = 'Green'; DisplayName = 'Sara Green'
             Department = 'Sales'; JobTitle = 'Sales Executive'
             Path = "OU=DerbyUsers,OU=Derby,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_DerbyUsers'
         }
         ADUser User_rkhan {
             UserName = 'r.khan'; GivenName = 'Raza'; Surname = 'Khan'; DisplayName = 'Raza Khan'
             Department = 'Ops'; JobTitle = 'Ops Coordinator'
             Path = "OU=NottinghamUsers,OU=Nottingham,OU=Derby,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_NottinghamUsers'
         }
         ADUser User_admjsmith {
             UserName = 'adm.jsmith'; GivenName = 'ADM'; Surname = 'JSmith'; DisplayName = 'ADM JSmith'
             Department = 'IT'; JobTitle = 'IT Admin Account'
             Path = "OU=BoltonAdmins,OU=Bolton,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_BoltonAdmins'
         }
         ADUser User_admdpatel {
             UserName = 'adm.dpatel'; GivenName = 'ADM'; Surname = 'DPatel'; DisplayName = 'ADM DPatel'
             Department = 'IT'; JobTitle = 'Derby IT Admin'
             Path = "OU=DerbyAdmins,OU=Derby,$base"; DomainName = $dom
-            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $false; Ensure = 'Present'
+            Enabled = $true; Password = $UserCredential; PasswordNeverExpires = $true; Ensure = 'Present'
             DependsOn = '[ADOrganizationalUnit]OU_DerbyAdmins'
         }
 
@@ -341,7 +341,7 @@ Configuration StudentBaseline {
                 dcdiag /test:services /test:advertising /test:fsmocheck 2>&1 | Out-File "$dir\HealthChecks\dcdiag_$ts.txt" -Encoding utf8
                 Get-ADOrganizationalUnit -Filter * | Select-Object Name,DistinguishedName | Export-Csv "$dir\AD\OUs_$ts.csv" -NoTypeInformation
                 Get-ADGroup -Filter * | Select-Object Name,GroupScope,GroupCategory | Export-Csv "$dir\AD\Groups_$ts.csv" -NoTypeInformation
-                Get-ADUser -Filter * -Properties Department,JobTitle | Select-Object SamAccountName,DisplayName,Department,JobTitle,Enabled | Export-Csv "$dir\AD\Users_$ts.csv" -NoTypeInformation
+                Get-ADUser -Filter * -Properties Department,Title | Select-Object SamAccountName,DisplayName,Department,Title,Enabled | Export-Csv "$dir\AD\Users_$ts.csv" -NoTypeInformation
                 Get-ADFineGrainedPasswordPolicy -Filter * | Out-File "$dir\AD\FGPP_$ts.txt" -Encoding utf8
                 Get-GPO -All | Select-Object DisplayName,GpoStatus | Out-File "$dir\GPOBackups\GPOList_$ts.txt" -Encoding utf8
                 Write-Host "Evidence collected." -ForegroundColor Green

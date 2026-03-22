@@ -6,9 +6,9 @@ AI usage logged in Evidence\AI_LOG\AI-Usage.md
 
 Configuration StudentBaseline {
     param(
-        [Parameter(Mandatory)][PSCredential]$DomainAdminCredential,
-        [Parameter(Mandatory)][PSCredential]$DsrmCredential,
-        [Parameter(Mandatory)][PSCredential]$UserCredential
+        [PSCredential]$DomainAdminCredential,
+        [PSCredential]$DsrmCredential,
+        [PSCredential]$UserCredential
     )
 
     Import-DscResource -ModuleName PSDesiredStateConfiguration
@@ -17,12 +17,25 @@ Configuration StudentBaseline {
 
     $cfg  = $ConfigurationData.AllNodes | Where-Object { $_.NodeName -eq 'localhost' } | Select-Object -First 1
     $base = 'DC=bolton,DC=barmbuzz,DC=test'
+    $dom  = 'bolton.barmbuzz.test'
 
     Node localhost {
 
-        # ── LAYER 0: Evidence folder ──────────────────────────────────────
+        # ── LAYER 0: Evidence folders ─────────────────────────────────────
         File EvidenceAD {
             DestinationPath = 'C:\BarmBuzz\Evidence\AD'
+            Type            = 'Directory'
+            Ensure          = 'Present'
+        }
+
+        File EvidenceHealth {
+            DestinationPath = 'C:\BarmBuzz\Evidence\HealthChecks'
+            Type            = 'Directory'
+            Ensure          = 'Present'
+        }
+
+        File EvidenceGPO {
+            DestinationPath = 'C:\BarmBuzz\Evidence\GPOBackups'
             Type            = 'Directory'
             Ensure          = 'Present'
         }
@@ -74,7 +87,7 @@ Configuration StudentBaseline {
             DependsOn   = '[ADDomain]BoltonDomain'
         }
 
-        # ── LAYER 3: OU Structure (data-driven) ───────────────────────────
+        # ── LAYER 3: OU Structure ─────────────────────────────────────────
         ADOrganizationalUnit OU_Bolton {
             Name        = 'Bolton'
             Path        = $base
@@ -252,8 +265,9 @@ Configuration StudentBaseline {
             Surname              = 'Smith'
             DisplayName          = 'John Smith'
             Department           = 'IT'
-            Title                = 'Systems Engineer'
+            JobTitle             = 'Systems Engineer'
             Path                 = "OU=BoltonUsers,OU=Bolton,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -266,8 +280,9 @@ Configuration StudentBaseline {
             Surname              = 'Jones'
             DisplayName          = 'Alice Jones'
             Department           = 'Finance'
-            Title                = 'Finance Analyst'
+            JobTitle             = 'Finance Analyst'
             Path                 = "OU=BoltonUsers,OU=Bolton,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -280,8 +295,9 @@ Configuration StudentBaseline {
             Surname              = 'Taylor'
             DisplayName          = 'Bob Taylor'
             Department           = 'HR'
-            Title                = 'HR Manager'
+            JobTitle             = 'HR Manager'
             Path                 = "OU=BoltonUsers,OU=Bolton,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -294,8 +310,9 @@ Configuration StudentBaseline {
             Surname              = 'Patel'
             DisplayName          = 'Dev Patel'
             Department           = 'IT'
-            Title                = 'Derby IT Technician'
+            JobTitle             = 'Derby IT Technician'
             Path                 = "OU=DerbyUsers,OU=Derby,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -308,8 +325,9 @@ Configuration StudentBaseline {
             Surname              = 'Green'
             DisplayName          = 'Sara Green'
             Department           = 'Sales'
-            Title                = 'Sales Executive'
+            JobTitle             = 'Sales Executive'
             Path                 = "OU=DerbyUsers,OU=Derby,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -322,8 +340,9 @@ Configuration StudentBaseline {
             Surname              = 'Khan'
             DisplayName          = 'Raza Khan'
             Department           = 'Ops'
-            Title                = 'Ops Coordinator'
+            JobTitle             = 'Ops Coordinator'
             Path                 = "OU=NottinghamUsers,OU=Nottingham,OU=Derby,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -336,8 +355,9 @@ Configuration StudentBaseline {
             Surname              = 'JSmith'
             DisplayName          = 'ADM JSmith'
             Department           = 'IT'
-            Title                = 'IT Admin Account'
+            JobTitle             = 'IT Admin Account'
             Path                 = "OU=BoltonAdmins,OU=Bolton,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -350,8 +370,9 @@ Configuration StudentBaseline {
             Surname              = 'DPatel'
             DisplayName          = 'ADM DPatel'
             Department           = 'IT'
-            Title                = 'Derby IT Admin'
+            JobTitle             = 'Derby IT Admin'
             Path                 = "OU=DerbyAdmins,OU=Derby,$base"
+            DomainName           = $dom
             Enabled              = $true
             Password             = $UserCredential
             PasswordNeverExpires = $false
@@ -421,65 +442,92 @@ Configuration StudentBaseline {
             DependsOn        = @('[ADUser]User_admdpatel','[ADGroup]GG_Derby_IT_Admins')
         }
 
-        # ── LAYER 7: GPOs ─────────────────────────────────────────────────
+        # ── LAYER 7: GPOs (PS5.1 compatible - no ternary operator) ────────
         Script GPO_BaselineSecurity {
-            GetScript  = { $g = Get-GPO -Name 'BB-Baseline-Security' -ErrorAction SilentlyContinue; @{ Result = if ($g) { 'Present' } else { 'Absent' } } }
-            TestScript = { [bool](Get-GPO -Name 'BB-Baseline-Security' -ErrorAction SilentlyContinue) }
+            GetScript  = {
+                $g = Get-GPO -Name 'BB-Baseline-Security' -ErrorAction SilentlyContinue
+                @{ Result = if ($g) { 'Present' } else { 'Absent' } }
+            }
+            TestScript = {
+                $g = Get-GPO -Name 'BB-Baseline-Security' -ErrorAction SilentlyContinue
+                return [bool]$g
+            }
             SetScript  = {
                 Import-Module GroupPolicy
                 New-GPO -Name 'BB-Baseline-Security' -Comment 'Baseline security: LLMNR disable, screen lock' | Out-Null
                 Set-GPRegistryValue -Name 'BB-Baseline-Security' -Key 'HKLM\Software\Policies\Microsoft\Windows NT\DNSClient' -ValueName 'EnableMulticast' -Type DWord -Value 0
                 Set-GPRegistryValue -Name 'BB-Baseline-Security' -Key 'HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop' -ValueName 'ScreenSaveTimeOut' -Type String -Value '600'
                 Set-GPRegistryValue -Name 'BB-Baseline-Security' -Key 'HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop' -ValueName 'ScreenSaverIsSecure' -Type String -Value '1'
-                New-GPLink -Name 'BB-Baseline-Security' -Target "OU=Bolton,DC=bolton,DC=barmbuzz,DC=test" -LinkEnabled Yes | Out-Null
+                New-GPLink -Name 'BB-Baseline-Security' -Target 'OU=Bolton,DC=bolton,DC=barmbuzz,DC=test' -LinkEnabled Yes | Out-Null
             }
             DependsOn  = '[WaitForADDomain]WaitDomain'
         }
 
         Script GPO_DerbyRegional {
-            GGetScript  = { $g = Get-GPO -Name 'BB-Derby-Regional' -ErrorAction SilentlyContinue; @{ Result = if ($g) { 'Present' } else { 'Absent' } } }
-            TestScript = { [bool](Get-GPO -Name 'BB-Derby-Regional' -ErrorAction SilentlyContinue) }
+            GetScript  = {
+                $g = Get-GPO -Name 'BB-Derby-Regional' -ErrorAction SilentlyContinue
+                @{ Result = if ($g) { 'Present' } else { 'Absent' } }
+            }
+            TestScript = {
+                $g = Get-GPO -Name 'BB-Derby-Regional' -ErrorAction SilentlyContinue
+                return [bool]$g
+            }
             SetScript  = {
                 Import-Module GroupPolicy
                 New-GPO -Name 'BB-Derby-Regional' -Comment 'Derby regional policy: USB restriction' | Out-Null
                 Set-GPRegistryValue -Name 'BB-Derby-Regional' -Key 'HKLM\System\CurrentControlSet\Services\USBSTOR' -ValueName 'Start' -Type DWord -Value 4
                 Set-GPRegistryValue -Name 'BB-Derby-Regional' -Key 'HKCU\Software\Policies\BarmBuzz' -ValueName 'Region' -Type String -Value 'Derby'
-                New-GPLink -Name 'BB-Derby-Regional' -Target "OU=Derby,DC=bolton,DC=barmbuzz,DC=test" -LinkEnabled Yes | Out-Null
+                New-GPLink -Name 'BB-Derby-Regional' -Target 'OU=Derby,DC=bolton,DC=barmbuzz,DC=test' -LinkEnabled Yes | Out-Null
             }
             DependsOn  = '[WaitForADDomain]WaitDomain'
         }
 
         Script GPO_AdminHygiene {
-            GetScript  = { $g = Get-GPO -Name 'BB-Admin-Hygiene' -ErrorAction SilentlyContinue; @{ Result = if ($g) { 'Present' } else { 'Absent' } } }
-
-            TestScript = { [bool](Get-GPO -Name 'BB-Admin-Hygiene' -ErrorAction SilentlyContinue) }
+            GetScript  = {
+                $g = Get-GPO -Name 'BB-Admin-Hygiene' -ErrorAction SilentlyContinue
+                @{ Result = if ($g) { 'Present' } else { 'Absent' } }
+            }
+            TestScript = {
+                $g = Get-GPO -Name 'BB-Admin-Hygiene' -ErrorAction SilentlyContinue
+                return [bool]$g
+            }
             SetScript  = {
                 Import-Module GroupPolicy
                 New-GPO -Name 'BB-Admin-Hygiene' -Comment 'Tier-1 admin isolation - privileged account hygiene' | Out-Null
                 Set-GPRegistryValue -Name 'BB-Admin-Hygiene' -Key 'HKLM\Software\Policies\BarmBuzz\AdminTier' -ValueName 'TierIsolation' -Type DWord -Value 1
-                New-GPLink -Name 'BB-Admin-Hygiene' -Target "OU=BoltonAdmins,OU=Bolton,DC=bolton,DC=barmbuzz,DC=test" -LinkEnabled Yes -Enforced Yes | Out-Null
+                New-GPLink -Name 'BB-Admin-Hygiene' -Target 'OU=BoltonAdmins,OU=Bolton,DC=bolton,DC=barmbuzz,DC=test' -LinkEnabled Yes -Enforced Yes | Out-Null
             }
             DependsOn  = '[ADOrganizationalUnit]OU_BoltonAdmins'
         }
 
         Script GPO_NottinghamOps {
-            GetScript  = { $g = Get-GPO -Name 'BB-Nottingham-Ops' -ErrorAction SilentlyContinue; @{ Result = if ($g) { 'Present' } else { 'Absent' } } 
-
-            TestScript = { [bool](Get-GPO -Name 'BB-Nottingham-Ops' -ErrorAction SilentlyContinue) }
+            GetScript  = {
+                $g = Get-GPO -Name 'BB-Nottingham-Ops' -ErrorAction SilentlyContinue
+                @{ Result = if ($g) { 'Present' } else { 'Absent' } }
+            }
+            TestScript = {
+                $g = Get-GPO -Name 'BB-Nottingham-Ops' -ErrorAction SilentlyContinue
+                return [bool]$g
+            }
             SetScript  = {
                 Import-Module GroupPolicy
                 New-GPO -Name 'BB-Nottingham-Ops' -Comment 'Nottingham ops unit baseline policy' | Out-Null
                 Set-GPRegistryValue -Name 'BB-Nottingham-Ops' -Key 'HKCU\Software\Policies\BarmBuzz' -ValueName 'Region' -Type String -Value 'Nottingham'
-                New-GPLink -Name 'BB-Nottingham-Ops' -Target "OU=Nottingham,OU=Derby,DC=bolton,DC=barmbuzz,DC=test" -LinkEnabled Yes | Out-Null
+                New-GPLink -Name 'BB-Nottingham-Ops' -Target 'OU=Nottingham,OU=Derby,DC=bolton,DC=barmbuzz,DC=test' -LinkEnabled Yes | Out-Null
             }
             DependsOn  = '[ADOrganizationalUnit]OU_Nottingham'
         }
 
         # ── LAYER 8: Fine-Grained Password Policy (A-grade) ───────────────
         Script FGPP_Admins {
-            GetScript  = { $p = Get-ADFineGrainedPasswordPolicy -Filter { Name -eq 'PSO-Admins' } -ErrorAction SilentlyContinue; @{ Result = if ($p) { 'Present' } else { 'Absent' } } }
-
-            TestScript = { [bool](Get-ADFineGrainedPasswordPolicy -Filter { Name -eq 'PSO-Admins' } -ErrorAction SilentlyContinue) }
+            GetScript  = {
+                $p = Get-ADFineGrainedPasswordPolicy -Filter { Name -eq 'PSO-Admins' } -ErrorAction SilentlyContinue
+                @{ Result = if ($p) { 'Present' } else { 'Absent' } }
+            }
+            TestScript = {
+                $p = Get-ADFineGrainedPasswordPolicy -Filter { Name -eq 'PSO-Admins' } -ErrorAction SilentlyContinue
+                return [bool]$p
+            }
             SetScript  = {
                 Import-Module ActiveDirectory
                 New-ADFineGrainedPasswordPolicy `
@@ -503,8 +551,12 @@ Configuration StudentBaseline {
 
         # ── LAYER 9: Evidence Collection ──────────────────────────────────
         Script CollectEvidence {
-            GetScript  = { @{ Result = 'Evidence' } }
-            TestScript = { $false }
+            GetScript  = {
+                @{ Result = 'Evidence' }
+            }
+            TestScript = {
+                return $false
+            }
             SetScript  = {
                 $ts  = Get-Date -Format 'yyyyMMdd_HHmmss'
                 $dir = 'C:\BarmBuzz\Evidence'
@@ -514,8 +566,8 @@ Configuration StudentBaseline {
                     Export-Csv "$dir\AD\OUs_$ts.csv" -NoTypeInformation
                 Get-ADGroup -Filter * | Select-Object Name,GroupScope,GroupCategory |
                     Export-Csv "$dir\AD\Groups_$ts.csv" -NoTypeInformation
-                Get-ADUser -Filter * -Properties Department,Title |
-                    Select-Object SamAccountName,DisplayName,Department,Title,Enabled |
+                Get-ADUser -Filter * -Properties Department,JobTitle |
+                    Select-Object SamAccountName,DisplayName,Department,JobTitle,Enabled |
                     Export-Csv "$dir\AD\Users_$ts.csv" -NoTypeInformation
                 Get-ADFineGrainedPasswordPolicy -Filter * |
                     Out-File "$dir\AD\FGPP_$ts.txt" -Encoding utf8
@@ -527,3 +579,5 @@ Configuration StudentBaseline {
         }
     }
 }
+
+

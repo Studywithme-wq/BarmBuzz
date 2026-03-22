@@ -21,6 +21,20 @@ Configuration StudentBaseline {
 
     Node localhost {
 
+        File TestFolder {
+            DestinationPath = 'C:\TEST'
+            Type            = 'Directory'
+            Ensure          = 'Present'
+        }
+        File TestFile {
+            DestinationPath = 'C:\TEST\test.txt'
+            Type            = 'File'
+            Ensure          = 'Present'
+            Contents        = 'Proof-of-life: DSC created this file.'
+            DependsOn       = '[File]TestFolder'
+        }
+
+
         File EvidenceAD {
             DestinationPath = 'C:\BarmBuzz\Evidence\AD'
             Type            = 'Directory'

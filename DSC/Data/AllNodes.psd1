@@ -21,6 +21,18 @@ See Documentation\README.md for lab passwords.
             IPv4Address_Internal        = '192.168.56.10/24'
             DefaultGateway_Internal     = '192.168.56.1'
 
+            InterfaceAlias_NAT              = 'Ethernet 2'
+            PrefixLength_Internal           = 24
+            DnsServers_Internal             = @('127.0.0.1')
+            Expect_NAT_Dhcp                 = $true
+            DisableDnsRegistrationOnNat     = $true
+            InstallADDSRole                 = $true
+            InstallRSATADDS                 = $true
+            TimeZone                        = 'GMT Standard Time'
+
+
+
+
             # --- DSC credential handling ---
             PSDscAllowPlainTextPassword = $true
             PSDscAllowDomainUser        = $true

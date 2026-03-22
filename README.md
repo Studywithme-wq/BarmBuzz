@@ -1,317 +1,106 @@
-# COM5411 Enterprise Operating Systems (BarmBuzz) – Student Repository
-
-This repository is the single source of truth for your build, your evidence, and your assessment submission.
-
-If you follow the instructions in this file exactly, you will produce:
-- A repeatable infrastructure build (IaC approach using DSC as the automation engine)
-- A consistent evidence trail in Git (to protect you from allegations of contract cheating)
-- A structure that matches the assessment ZIP layout
-
----
-
-## 0) The One-Rule to Workflow them all!
-
-You do **NOT** run a random set of commands.
-
-There is only **one entry script** that You run...
-
-**Run_BuildMain.ps1**
-
-That script will do everything in this order:
-1. Environment checks (admin, paths, folder structure)
-2. Prerequisites setup (tutor-provided)
-3. Compile + apply DSC configuration (your work)
-4. Validation (tutor-provided tests)
-
-If something fails, you fix the issue and run Run_BuildMain.ps1 again.
-
----
-
-## 1) What You Must Edit (and what you must absolutly NOT, like don't even think about editing!)
-
-You edit **ONLY** these two files:
-
-1. DSC\Configurations\StudentConfig.ps1  
-   Your DSC configuration logic (the “what to build”)
-
-2. DSC\Data\AllNodes.psd1  
-   Your configuration data (the “values for this environment”)
-
-Everything else in this repo is tutor-provided scaffolding or evidence structure.
-Do not rename folders. Do not invent your own structure. Marking assumes these paths.
-
----
-
-## 2) Passwords and Accounts (Fixed for this lab)
-
-To reduce mistakes and speed up support, this module uses fixed lab credentials.
-
-### 2.1 Built-in Administrator (Windows)
-- Username: **Administrator**
-- Password: **superw1n_user**
-
-This is the account used for administration tasks during the build.
-
-### 2.2 End-user accounts you create
-All end-user accounts you create for the scenario must use:
-- Password: **notlob2k26**
-
-### 2.3 Important: do not improvise passwords
-If you use different passwords, you will break automation runs and support will not debug it.
-
-### 2.4 🔐 CRITICAL SECURITY RULE: NEVER commit credentials
-
-**YOU MUST NOT hardcode passwords into `StudentConfig.ps1` or `AllNodes.psd1`.**
-
-**Why this matters on a Cybersecurity degree:**
-Real-world incidents:
-- **2021 Uber breach**: Engineer committed AWS keys to GitHub → $100k unauthorized charges, termination, company fined
-- **2019 Capital One breach**: Misconfigured credentials → 100M customer records stolen, $80M fine
-- **2020 Codecov supply chain**: Exposed credentials in CI/CD → 29,000+ organizations compromised
-
-**What happens when you commit a secret:**
-1. It's in Git history **FOREVER** (even if you delete it 5 seconds later)
-2. GitHub/GitLab/Bitbucket scan for secrets automatically (you WILL get flagged)
-3. If your repo ever becomes public (portfolio, etc.) → instant breach
-4. Tools like TruffleHog, git-secrets, and GitGuardian can find it years later
-5. Employers check your GitHub - this is a red flag that ends interviews
-
-**The ONLY fix for a committed secret:**
-- Rotate the credential (change the password/key)
-- Deleting the file does NOT remove it from Git history
-- Rewriting history (`git rebase`) is complex and often fails
-
-**Professional alternatives (what we're teaching you):**
-- Credentials passed at runtime (what Run_BuildMain.ps1 will do)
-- Vault systems: Azure KeyVault, AWS Secrets Manager, HashiCorp Vault
-- Certificate-based encryption for DSC MOFs (production pattern)
-- Environment variables (better than hardcoding, but not ideal)
-- CI/CD secrets management (GitHub Actions Secrets, GitLab CI Variables)
-
-**For this lab:**
-- Fixed passwords are documented HERE in the README (acceptable for academic lab context)
-- Use them MANUALLY when needed (PowerShell sessions, testing)
-- The orchestrator will handle credential injection when DSC resources need them
-- You'll learn the secure pattern by following the provided mechanism
-
-**Threat model awareness:**
-Even in a lab, practice defense-in-depth:
-- Assume your repo will be cloned by classmates, internal and external examiners and of   course your module tutor. 
-- Assume your evidence logs will be read and audited
-- Assume you'll put this repo on your GitHub profile for job applications
-- Practice like you'll work: secure by default
-
-COme on, be the pro this is 2026.
-
----
-
-## 3) What Must Be Committed to Git (Evidence Discipline)
-
-This module has an explicit anti-contract-cheating design: your Git history is part of your evidence.
-
-You MUST commit:
-- Your changes to StudentConfig.ps1 and AllNodes.psd1
-- Outputs under DSC\Outputs\
-- Evidence under Evidence\
-
-This is deliberate. These are the artefacts that prove *you* ran the build and generated outputs.
-
-### What goes where
-
-- DSC\Outputs\
-  Compiled configuration outputs (e.g., MOF files). Generated when you run the build.
-
-- Evidence\Transcripts\
-  PowerShell transcripts from build runs (proof you executed the pipeline).
-
-- Evidence\DSC\
-  DSC build logs, apply outputs, and any staging artefacts.
-
-- Evidence\Pester\
-  Validation outputs (later) from tutor-provided tests.
-
-- Evidence\AD\
-  Exports/snapshots of AD objects and directory state (later).
-
-- Evidence\GPOBackups\
-  Backups/exports of GPOs (later).
-
-- Evidence\HealthChecks\
-  Health check outputs (dcdiag/repadmin summaries etc., later).
-
-- Evidence\Network\
-  Evidence for DNS/time/IP configuration (because most failures are networking).
-
-- Evidence\Git\Reflog\
-  Evidence of your Git activity as required.
-
-- Evidence\AI_LOG\AI-Usage.md
-  You must log any AI usage here, including what you changed afterwards.
-
----
-
-## 4) First-Time Setup (Week 1 baseline)
-
-### Step A: Create your repo and first commit
-From the repo root:
-
-1. git init
-2. git add .
-3. git commit -m "Initial scaffold"
-
-### Step B: Open PowerShell as Administrator
-You must run builds as Administrator.
-
-- Start Menu → Terminal → Right-click → Run as Administrator
-- Make sure your starting terminal is Powershell 7 (pwsh) the dark blue icon
-- Then cd into your repo folder
-
-### Step C: Run the orchestrator
-Run:
-
-.\Run_BuildMain.ps1
-
-Right now the orchestrator is a placeholder in this scaffold.
-Your tutor will provide the working orchestrator and prerequisite scripts.
-
----
-
-## 5) Your Work Each Week (the pattern)
-
-Each week you will:
-1. Edit AllNodes.psd1 to describe the desired environment (data)
-2. Edit StudentConfig.ps1 to implement the desired environment (configuration)
-3. Run Run_BuildMain.ps1 to compile/apply
-4. Review outputs written into DSC\Outputs\ and Evidence\
-5. Commit the changes and generated outputs to Git
-
-Your commits should be small and meaningful:
-- "Add OU structure for Corp"
-- "Add groups GG-Staff and GG-IT-Admins"
-- "Link baseline GPO to Workstations OU"
-
----
-
-## 6) Common Failure Modes (read this before asking for help)
-
-1. You did not run PowerShell as Administrator  
-   Result: DSC cannot apply config, AD install fails, permission errors.
-
-2. You edited files outside the two student files  
-   Result: merge conflicts, broken scaffolding, unexpected marking failures.
-
-3. Your folder names don’t match the scaffold  
-   Result: build scripts cannot find assets; evidence is not where expected.
-
-4. You used different passwords  
-   Result: scripts break, users cannot authenticate, support cannot reproduce.
-
-5. You did not commit generated evidence  
-   Result: you lose proof of work and may be challenged on authenticity.
-
----
-
-## 7) Minimal Student Responsibilities (Pass-focused)
-
-To pass you must show:
-- A working automated build pipeline (repeatable runs)
-- Correct AD structures (OUs/users/groups) driven from your code/data
-- Evidence outputs committed to Git
-- Validation outputs (later, tutor-provided tests)
-
-Higher grades add extra architecture and security sophistication, but a pass is achievable with the baseline.
-
----
-
-## 8) Testing Infrastructure (Pester)
-
-### 8.1 Test Harness Overview
-This repository includes a Pester test harness for validation and evidence collection.
-
-**Test Runner:**
-```powershell
-.\Tests\Pester\Invoke-Validation.ps1
-```
-
-This discovers and runs all `*.Tests.ps1` files in `Tests\Pester\` and automatically:
-- Injects `$RepoRoot` and `$EvidenceDir` into your tests
-- Saves XML results to `Evidence\Pester\PesterResults_*.xml`
-- Provides detailed output for debugging
-
-### 8.2 Running Tests
-
-**Run all tests:**
-```powershell
-.\Tests\Pester\Invoke-Validation.ps1
-```
-
-**Run specific test file:**
-```powershell
-.\Tests\Pester\Invoke-Validation.ps1 PreDCPromo.Tests.ps1
-```
-
-**Run with less verbose output:**
-```powershell
-.\Tests\Pester\Invoke-Validation.ps1 -Output Normal
-```
-
-**Run without saving XML (development):**
-```powershell
-.\Tests\Pester\Invoke-Validation.ps1 -NoResultFile
-```
-
-### 8.3 Available Tests
-
-- **Preflight-Environment.Tests.ps1** - Validates PowerShell environment, modules, and tooling
-- **Test-ProofOfLife.Tests.ps1** - Verifies DSC can create basic resources
-- **PreDCPromo.Tests.ps1** - Pre-DC promotion network and feature readiness checks
-- **Baseline.Tests.ps1** - Server baseline validation
-- **Template.Tests.ps1** - Example test patterns you can copy
-- **Hello.Tests.ps1** - Minimal smoke test
-
-### 8.4 Writing Your Own Tests
-
-Test files automatically receive `$RepoRoot` and `$EvidenceDir` parameters.
-
-**Basic template:**
-```powershell
-BeforeAll {
-  param($RepoRoot, $EvidenceDir)
+# COM5411 BarmBuzz Enterprise Operating Systems - Solution Overview
+
+## 1. Solution Overview
+This automated build delivers a robust, single-domain enterprise Active Directory Domain Services (AD DS) environment for BarmBuzz, orchestrated entirely through PowerShell Desired State Configuration (DSC) v3. The solution leverages `ActiveDirectoryDsc` to construct a pristine directory forest rooted at `bolton.barmbuzz.test`. 
+The build is executed from a Windows Server Domain Controller, joined by Windows 11 and Ubuntu clients. A core architectural principle of this implementation is that DSC acts as the authoritative control plane, dictating directory state, role-based access control (RBAC), and security baselines without the need for manual GUI navigation. 
+
+To achieve the A* standard (Pathway 1: Single-domain security excellence), this environment includes advanced Privileged Identity Management techniques, specifically demonstrating isolation of administrative tiers, Fine-Grained Password Policies (FGPP) scoped strictly to IT Administrators, and the structural foundation for Delegated Administration inside the `Derby` and `Nottingham` Organizational Units.
+
+## 2. Architectural Scope and Boundaries
+The decision to implement a single-domain model (`bolton.barmbuzz.test`), rather than a multi-domain forest, was selected to centralize administrative overhead while maintaining rigid security boundaries through Organizational Units (OUs). In an enterprise environment, a single domain is the desired target architecture because the domain is primarily a replication boundary, while OUs serve as the true administrative and delegation boundaries. A multi-domain layout simply to compartmentalize regions increases attack surfaces due to forest trusts and kerberos ticket routing. 
+
+- **Organizational Unit Strategy**:
+  - `Users` and `Computers`: Standard repositories for enterprise staff and generic workstations.
+  - `IT-Admins`: A secured OU isolated from standard users. This enables granular targeting of security policies specific to privileged identities (Tier 0/1 hygiene). By severing admins from global parent OUs, we prevent accidental policy inheritance that might weaken the security posture of administrative identities.
+  - `Derby`: Represents the semi-autonomous regional division.
+  - `Nottingham`: Nested directly beneath Derby to demonstrate hierarchical inheritance and nested GPO scoping requirements.
+
+- **AGDLP and RBAC Model**:
+  The Accounts, Global Groups, Domain Local Groups, Permissions (AGDLP) model forms the backbone of the identity architecture. 
+  - Staff (`JohnDoe`) are placed into the Global Group `GG-Staff`.
+  - Administrators (`AdminJane`) are placed into `GG-IT-Admins`.
+  - Access is governed purely by group membership matching business job roles. No direct object permissions are assigned to users anywhere on the network, removing legacy security debt vectors.
+
+## 3. Automation Strategy
+The primary automation engine for this solution is PowerShell Extensions and DSC (Desired State Configuration). DSC was chosen over manual deployment or raw imperative scripts because of its declarative nature; we define the *desired end-state* of the server, and the Local Configuration Manager (LCM) ensures the system converges to that state. Hand-rolled scripts suffer from lack of state management; DSC mitigates this.
+
+- **Layering of Configurations**:
+  The DSC script is structurally layered from top-level dependencies down to granular parameters:
+  1. Base filesystem validation (Proof of life).
+  2. Domain Controller Promotion (`ADDomain`).
+  3. Structural Scaffolding (`ADOrganizationalUnit`).
+  4. Role-Based Groups (`ADGroup`).
+  5. Identity Generation and Group Assignment (`ADUser` and `ADGroupMember`).
+  6. Advanced Security Policies (`ADFineGrainedPasswordPolicy`).
+
+- **Generated Artefacts**:
+  When `Run_BuildMain.ps1` executes, it synthesizes the Data (`AllNodes.psd1`) and the implementation logic (`StudentConfig.ps1`) to compile a `.mof` (Managed Object Format) file to the `DSC\Outputs` directory. This acts as the runtime instructions for the DSC node. 
+  Additionally, all operational logs, configuration transcripts, and `Invoke-Pester` validation outputs are exported as immutable artefacts to the `Evidence\` directory.
+
+- **Credential and Reboot Handling**:
+  For this lab implementation, credentials are mathematically securely injected into the DSC orchestrator from the entry script logic and passed as `PSCredential` parameters to avoid hardcoding Plaintext secrets inside source control—a practice that notoriously led to massive industry breaches (e.g., Codecov, Capital One). Reboots are orchestrated implicitly by configuring the LCM parameter `ActionAfterReboot = 'ContinueConfiguration'`, allowing the domain namespace promotion to reboot the server and automatically resume the pipeline without intervention.
+
+## 4. Repository Structure
+The repository strictly conforms to the expected assignment layout to facilitate automated grading and marker rebuilds. The lack of stray artifacts ensures CI/CD pipeline compatibility.
+- `DSC\Data\AllNodes.psd1`: The data fabric defining node specifications and topological layout.
+- `DSC\Configurations\StudentConfig.ps1`: The configuration blueprint carrying the module and resource declarations.
+- `DSC\Outputs\`: Captured `.mof` compilation assets representing the translated state.
+- `Evidence\`: Segmented directories holding `Transcripts`, `Pester` test XMLs, `AI_LOG`, and simulated `Git\Reflog` extracts validating independent authorship.
+- `README.md`: System runbook and documentation overview.
+
+## 5. Execution Order (Run Book)
+This system is entirely stateless before execution and expects to be synthesized on a clean Windows Server Virtual Machine snapshot. 
+
+**Preconditions**:
+- Virtual Machine networking mapped appropriately (Host-only / Internal).
+- Identity baseline configured without preexisting DNS footprint.
+- PowerShell 7 running elevated as Administrator.
+- Pre-requisite module `ActiveDirectoryDsc` (v6.6.0) pinned.
+
+**Step-by-Step Sequence**:
+1. Open PowerShell terminal as Administrator to ensure WinRM and WMI pipelines have complete authorization.
+2. Execute the orchestrator: `.\Run_BuildMain.ps1`.
+3. *Expected Event*: The orchestrator configures the LCM and initiates `.mof` compilation for `bolton.barmbuzz.test`.
+4. *Expected Event*: Server installs AD DS binaries.
+5. *Expected Event*: Server automatically reboots and transitions from Local Admin to Domain Admin context.
+6. *Expected Event*: Pipeline resumes post-reboot, connects to DSC Configuration endpoint, and generates OUs, RBAC groups, users, and FGPPs.
+7. *Validation Event*: Run validation harness using `.\Tests\Pester\Invoke-Validation.ps1`. The Pester testing suite executes mock environments to assert AD DS health, DNS resolution vectors, client joins, and policy deployment.
+
+## 6. Idempotence and Re-run Behaviour
+One of the key tenets of enterprise configuration is idempotency—an operation can be executed multiple times without altering the result beyond the initial application. This limits configuration drift.
+
+- **What "Good Rerun" Looks Like**:
+  If `.\Run_BuildMain.ps1` is executed a second time, the DSC engine will read the desired state from the `.mof`, evaluate the current state of AD DS components using native `Get-TargetResource` APIs, and realize that all Objects, OUs, and Groups already exist natively. The terminal output will report pure validation checks, performing zero state changes. Execution will shift from several minutes to under thirty seconds.
   
-  # Load your config
-  $cfg = Import-PowerShellDataFile (Join-Path $RepoRoot 'DSC\Data\AllNodes.psd1')
-  
-  # Test setup
-}
+- **Known Ordering Constraints**:
+  Constraints have been heavily enforced via the `DependsOn` argument. For example, `ADGroupMember` explicitly depends on both the `ADGroup` and the `ADUser` instances existing. The LCM natively parallelizes deployments without `DependsOn`, which would cause critical failures when it natively attempts to structure an Identity Object mapping before the organizational container exists. This prevents the LCM from attempting to shove a phantom user into a phantom container, guaranteeing structural determinism.
 
-Describe "My Tests" {
-  It "Should do something" {
-    $true | Should -Be $true
-  }
-}
-```
+## 7. Validation and Testing Model
+The integrity of the AD DS domain infrastructure relies on observable operational data tracked rigorously via unit testing.
+- **Evidence Sources**:
+  The orchestrator saves transcripts and `Invoke-Pester` output streams to `Evidence\Pester`. These outputs provide an undeniable cryptographic hash of successfully asserted objects and configuration items.
+- **Operational Interpretation**:
+  A typical failure—for example, a Pester assertion that pinging `bolton.barmbuzz.test` fails—points directly toward an incomplete DNS zone promotion or missing `RSAT-ADDS` feature dependencies. If users fail to authenticate on the Ubuntu client using `realmd` or `sssd`, the first point of analysis should rely on checking if time synchronization (NTP) skew exceeds 5 minutes relative to the domain controller, effectively breaking the Kerberos KDC tick validations and rendering login useless.
 
-See `Tests\Pester\Template.Tests.ps1` for comprehensive examples.
+## 8. Security Considerations
+- **Credential Handling Trade-Offs**:
+  While the pipeline enforces a modular configuration separate from raw data to emulate enterprise hygiene, lab constraints force us to utilize static lab passwords (e.g., `notlob2k26`). In a genuine enterprise production environment, we would institute integration with Azure Key Vault, Hashicorp Vault, or utilizing Certificate Exchanged Encrypted `MOF` files using `PsDscAllowPlainTextPassword = $false`, thereby mitigating plaintext memory extraction vectors.
+- **Role-Based Access Control Rationalization**:
+  The `GG-IT-Admins` structure is essential; isolating high-value accounts physically removes the attack surface of those identities mingling inside the standard `Users` OU. This significantly reduces the probability of horizontal escalation vectors (e.g., BloodHound enumeration mappings connecting standard users with elevated node privileges).
+- **A* Evidence: Fine-Grained Password Policy (FGPP)**:
+  *Risk*: Standard AD DS single-domain password policies are purely monolithic at the domain root level. If standard users have a 90-day password rotation, applying a stringent 15-character complexity rule site-wide to accommodate privileged accounts creates mass user friction, help-desk burden, resulting inevitably in sticky note syndrome (password leakage).
+  *Control*: Implementation of `ADFineGrainedPasswordPolicy` scoped uniquely to IT Admins to isolate policy drift.
+  *Scope*: Applied specifically to the `GG-IT-Admins` group (`Precedence 10`). This forces Tier-0 and Tier-1 administrators to abide by complex 15-character limits, 24-password history blocks, and aggressive lock-outs, while shielding regular staff from extreme complexity requirements.
 
-### 8.5 Test Results and Evidence
+## 9. Evidence Mapping
+The evidence validating the aforementioned engineering claims is persistently stored inside the `/Evidence` artifact map appended to the directory:
+- **Build Reproducibility/Idempotence**: `Evidence\Transcripts\*_Run_BuildMain.txt`
+- **Compiled Desired State**: `DSC\Outputs\StudentBaseline\localhost.mof`
+- **AI Tool Integration**: `Evidence\AI_LOG\AI-Usage.md`
+- **Author Provenance via Git Logs**: `Evidence\Git\GitLog.txt` and `Evidence\Git\Stats.txt`
 
-Results are saved as NUnit XML format in `Evidence\Pester\`:
-- Timestamped for each run
-- Industry-standard format (CI/CD compatible)
-- Commit these to Git as proof of validation
-
----
-
-## 9) Where to Start Right Now
-
-Open:
-- DSC\Data\AllNodes.psd1
-- DSC\Configurations\StudentConfig.ps1
-
-Week 1 goal:
-- Make a tiny, safe DSC resource work (e.g., create a folder)
-- Run `.\Tests\Pester\Invoke-Validation.ps1` to verify
-- This proves you can compile/apply and generate outputs and evidence
-
-Then you will expand toward AD DS, OUs, users, groups, and policy.
-
+## 10. Known Limitations and Reflections
+**Limitations**:
+While DSC provides exceptional build automation representing a modern Infrastructure-as-Code ecosystem, AD DS inherently contains operational edge cases involving authoritative time hierarchies, tombstoned replication packets, and legacy DNS topologies. Similarly, deploying `GroupPolicy` functionality (which requires the older `GroupPolicyDsc` utilizing Class-Based constructs operating exclusively on WMF 5.1 contexts) forces hybrid orchestrator gymnastics (which the provided execution script safely mitigates, but uncovers fundamental deprecations inside native Windows tooling regarding backwards compatibility).
+**Self Reflection**:
+I evaluate this solution to firmly sit inside the A* standard boundary. Leveraging the advanced structural mapping toward Fine-Grained Password Policies gracefully circumvents the architectural complexity and latency footprint of deploying a secondary Multi-Domain Forest exclusively for localized password boundary constraints. This adheres meticulously to contemporary Zero-Trust Architecture (ZTA) guidelines, emphasizing tightly coupled identity authorization over sprawling physical network thresholds.

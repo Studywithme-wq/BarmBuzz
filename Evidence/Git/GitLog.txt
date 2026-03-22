@@ -1,0 +1,37 @@
+* 28c379f (HEAD -> main) Author extensive solution architecture documentation
+* 7c9d239 Draft AI usage and reflection logs
+* 99c90e6 Implement A* Architecture with FGPP and Tier Isolation
+* 1728172 Configure root domain mapping data
+* 3150dbd (origin/main, origin/HEAD) Update Run_BuildMain.ps1 to use hardcoded credentials for lab purposes; add warnings about security practices and provide alternative production methods.
+* 88e23ea imported framework files
+* 39427ae Delete Tests/Pester/PreDC_OLD
+* 829ad91 Rename PreDCPromo.Tests.ps1 to Tests/Pester/PreDCPromo.Tests.ps1
+* 005b0de Remove PreDCPromo.Tests.ps1 file
+* 8ca5e1d Add files via upload
+* 73ae255 Clean up test evidence files and update AllNodes.psd1
+* 4c94bcf Add helpful hints to all test files
+* eac62b3 feat: Enhance Pester testing framework with comprehensive documentation and new test templates
+* 97c9c44 DOCS: Added information about credential handeling in the framework with real security examples
+* ee042c8 DOCS: Updates pester readme.md
+* c372a60 feat: Enhance Invoke-Validation script and README for clarity on test execution and data injection
+* 6e0d976 feat: Enhance Pester tests with injected parameters for repo root and evidence directory
+* 8ecdfa8 feat: Improve RSAT installation instructions with clearer comments and structure
+* 45ec331 docs: Revise README for clarity and structure in Pester test instructions
+* ae79125 feat: Update scripts for Pester v5 compatibility and enhance RSAT installation instructions
+* 2e778e2  got rid of bad verb in oneshot
+* c69dc82 feat: Implement Invoke-Validation.ps1 for structured Pester test execution and add evidence files for DSC configuration and network settings
+* a228b89 added in the information in the Pester Readme
+* 1e864be feat: Update DSC configurations and network scripts for improved resource management and error handling
+* 1ecf037 docs: Update README.md and StudentRepoInit.ps1 for clarity and consistency in instructions
+* dfcf418 feat: Enhance Run_BuildMain.ps1 with detailed comments and idempotency flags for clarity and consistency
+* f071217 feat: Introduce Run_BuildMain.ps1 orchestrator script for DSC automation
+* 7e2604c feat: added proof of life pester test
+* 726d307 feat: afixed LCM and Networks Idempotency checks
+* 97e0839 feat: afixed LCM and Networks Idempotency checks
+* 9636548 feat: afixed LCM and Networks orchestration
+* db35283 feat: add network and LCM setup scripts for BarmBuzz orchestration
+* 820a67f feat: add network and LCM setup scripts for BarmBuzz orchestration
+* bbec2a4 refactor: update StudentBaseline configuration to include directory and file resources
+* aa5143d changed the function names to make more sense
+* e94f158 added in the run_Barmbuzz.ps1 from test to studentrepo
+* da989a1 Initial scaffold

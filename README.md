@@ -1,112 +1,282 @@
-# COM5411 BarmBuzz Enterprise Operating Systems - Solution Overview
+# COM5411 Enterprise Operating Systems — BarmBuzz Solution
+
+**GitHub Repository:** https://github.com/Studywithme-wq/BarmBuzz
+**ZIP version note:** This ZIP matches the repository as of the final commit on the main branch. See `Evidence\Git\GitLog.txt` for the exact commit hash.
+
+---
 
 ## 1. Solution Overview
-This automated infrastructure build delivers a robust, single-domain enterprise Active Directory Domain Services (AD DS) environment for BarmBuzz, orchestrated entirely through PowerShell Desired State Configuration (DSC) v3. The solution leverages `ActiveDirectoryDsc` (v6.6.0) to construct a pristine directory forest rooted at the namespace `bolton.barmbuzz.test`. 
 
-The build is executed automatically on a Windows Server 2025 Domain Controller, later to be joined by Windows 11 and Ubuntu clients. A core architectural operating principle of this implementation is that DSC acts as an immutable and authoritative control plane. It dictates directory topography, state management, Role-Based Access Control (RBAC) scaffolding, and advanced security baselines natively, completely bypassing any requirement or reliance on manual graphical user interfaces (GUI) or interactive configuration wizards. 
+A fully automated, single-domain enterprise Active Directory Domain Service (AD DS) environment is built for the BarmBuzz organization. This implementation uses only PowerShell Desired State Configuration (DSC) v3, which acts as the primary control plane for the infrastructure. To represent the Bolton headquarters as the authoritative identity boundary for the organization, `bolton.barmbuzz.test` acts as the forest root domain — a single domain forest running on Windows Server 2025 (Hester and Henley, 2013).
 
-To achieve the uncompromising standard expected by the **A* grade (Pathway 1: Single-domain security excellence)** matrix, this environment natively integrates advanced Privileged Identity Management (PIM) constraints. Specifically, it demonstrates the total isolation of high-value administrative tiers, Fine-Grained Password Policies (FGPP) strictly localized to IT Administrators preventing lateral compromise, and fully nested AGDLP (Accounts -> Global Groups -> Domain Local Groups -> Permissions) models forming the structural foundation required for future Delegated Administration inside the segregated `Derby` and nested `Nottingham` Organizational Units.
+The build targets the following components: a Windows Server 2025 Domain Controller running on a VirtualBox virtual machine, a Windows 10 client for Group Policy validation, and an Ubuntu virtual machine to verify cross-platform authentication. The two student-authored files, `DSC\Data\AllNodes.psd1` and `DSC\Configurations\StudentConfig.ps1`, define the desired state and are responsible for converging the system idempotently on every run.
+
+This submission implements Pathway 1 — single-domain security excellence — rather than a Derby child domain (Smirnov, 2024). Fine-Grained Password Policies (FGPP) are used to demonstrate enterprise-correct privileged identity management alongside a tiered OU model aligned with Microsoft's Enhanced Security Admin Environment (ESAE). Derby and Nottingham are implemented as Organisational Units within the single domain.
+
+
 
 ## 2. Architectural Scope and Boundaries
-The fundamental decision to execute a meticulously crafted single-domain model (`bolton.barmbuzz.test`), rather than artificially spawning a multi-domain or multi-forest hybrid, was intentionally calculated to centralize administrative processing overhead while maintaining exceptionally rigid geometric security boundaries routed exclusively through robust Organizational Units (OUs). In a modern enterprise Windows environment, a single domain serves as the optimal target architecture; the "domain" natively functions merely as a replication and routing boundary, whereas the internal "Organizational Units" function as the true administrative, targeting, and delegation boundaries. Engineering a multi-domain layout simply to compartmentalize physical geographic regions introduces significant and avoidable attack surfaces driven by forest trusts, complex Kerberos Ticket Granting Ticket (TGT) routing, and heightened synchronization overhead. 
 
-### Organizational Unit Target Strategy
-- **`Users` and `Computers`**: These represent the standard structural repositories for generic enterprise staff and unclassified workstations. They receive fundamental baseline GPO targets.
-- **`BoltonAdmins`**: A drastically secured and logically isolated Organizational Unit separated totally from standard unprivileged objects. This container enables granular targeting of elevated security policies and distinct FGPP overlays specific to privileged Tier-0 identities. By entirely severing these administrative user objects from global parent inheritance pathways, we structurally inoculate the directory against accidental policy drift that might inadvertently weaken the security posture of BarmBuzz administrative operators.
-- **`Derby`**: This OU symbolizes the semi-autonomous regional division demanding delegated scoping criteria.
-- **`DerbyAdmins`**: Nested inside the `Derby` container mirroring the Tiered administrative configuration modeled at the root.
-- **`Nottingham`**: Nested directly beneath the primary `Derby` tree, this OU deliberately exists to demonstrate complex hierarchical Group Policy Object (GPO) inheritance pathways, proving the environment successfully negotiates nested security scopes algorithmically.
+### Forest and Domain Boundary Justification
 
-### AGDLP Identity Access and RBAC Model
-The gold-standard Accounts, Global Groups, Domain Local Groups, Permissions (AGDLP) model constitutes the foundational backbone of our identity and compliance structure. Direct manipulation of Access Control Lists (ACLs) applied ad-hoc directly towards individual User identities generates astronomical technical debt known as "ACL sprawl." AGDLP ensures sustainability:
-- **Accounts**: Employees belonging to BarmBuzz (`JohnDoe` handling staff roles, `AdminJane` handling infrastructure operations).
-- **Global Groups**: Users are explicitly clustered into geographic and functional Global Groups (`GG-BoltonAdmins`, `GG-DerbyStaff`, `GG-DerbyAdmins`, `GG-NottinghamStaff`). Global Groups catalog precisely "who" an individual is.
-- **Domain Local Groups**: Global groups are then hierarchically bound into Domain Local Groups (e.g., `DLG-BoltonAdmins` and `DLG-DerbyAdmins`). Domain Local Groups dictate precisely "what permissions" the collective union is granted.
-- **Permissions**: Finally, access capabilities—such as NTFS filesystem permissions or AD DS object delegation parameters—are solely granted pointing directly at the `DLG-X` scope target.
+A critical architectural decision was to maintain BarmBuzz as a single domain. Active Directory acts as a replication boundary while administrative boundaries are enforced through Organisational Units. All directory data replicates automatically, but users and policies remain separated through OUs. This reduces the complexity of a multi-domain topology and provides flexible regional management (Berkouwer, 2022).
+
+### Tier Model
+
+Microsoft's ESAE-aligned tier framework is implemented. Tier 0 covers domain controllers and highly privileged accounts. Tier 1 covers server and infrastructure management. Tier 2 covers standard user accounts and workstations. This decision mitigates the risk of lateral movement, where a compromise at a lower tier cannot easily escalate to higher-tier systems.
+
+### Organisational Units
+
+Admin accounts are separated into dedicated OUs — `OU=BoltonAdmins` and `OU=DerbyAdmins` — ensuring that user policies and admin policies do not interfere with each other. Administrative accounts cannot be exposed to weak user-level policy restrictions, and the tiered OU structure enables GPO scoping to privileged identities exclusively. An exported OU structure confirming all eleven OUs at their correct Distinguished Name paths is available at `Evidence\AD\OUs_final.csv`.
+
+### AGDLP Model
+
+Access control follows the AGDLP model — Accounts placed in Global Groups representing roles, nested inside Domain Local Groups holding resource permissions. No user ever receives a direct permission assignment. As a concrete example, `j.smith` is placed in `GG-IT-Staff` (Global Group), which is nested inside `DL-FileShare-Bolton-R` (Domain Local Group), which holds the read permission on the Bolton file share (Krause, 2023). This aligns with NIST SP 800-53 AC-6 (Least Privilege) (Joint Task Force Interagency Working Group, 2020).
+
+For the Derby regional IT team, specific permissions are delegated at the OU level. `GG-Derby-IT-Admins` holds Create and Delete User object rights over `OU=Derby`, enabling regional administration without Domain Admin membership.
+
+
 
 ## 3. Automation Strategy
-The primary automation engine propelling this solution is PowerShell Desired State Configuration (DSC) exploiting native declarative configurations parsed iteratively by the Local Configuration Manager (LCM). DSC was selected strictly over manual deployment mechanisms, imperative raw PowerShell scripting, or batch files predominantly because of the mechanism’s declarative integrity. With DSC, we map the ultimate *desired end-state* of the node architecture inside the Managed Object Format (MOF); subsequently, the LCM automatically queries the underlying Win32 APIs, diffs current configurations against intended directives, and enforces convergence. Hand-rolled imperative scripts natively suffer from an extreme lack of persistent state management—DSC fully mitigates this deficiency.
 
-### Layering of Node Configurations
-The master `.ps1` execution script is structurally layered traversing gracefully from top-level service prerequisites downwards into granular identity and localized file parameters:
-1. **Base Environmental Constraints**: Hardens localized OS variables (Domain/Computer Naming variables, execution TimeZone alignments, and aggressive assertions targeting the W32Time Service for essential cyclic Kerberos timestamp accuracy).
-2. **Domain Controller Promotion (`ADDomain`)**: Elevates the blank node manipulating the raw Microsoft directory services. Natively includes `ADWaitForDomain`, pausing parallel DSC processing chains precisely until SYSVOL replicas and global root environments are actively responding perfectly to TCP port validation frames.
-3. **Structural OUs (`ADOrganizationalUnit`)**: Synthesizes the fundamental container objects required prior to spawning inner security descriptors.
-4. **AGDLP Nested Groups (`ADGroup`)**: Instantiates cross-referenced Global and Domain Local groupings.
-5. **Identity Synthesis and Group Population (`ADUser` and `ADGroupMember`)**: Populates the internal BarmBuzz staff variables mapped tightly inside previously unrolled parent containers and explicit group mappings without cyclic dependency errors.
-6. **Group Policy Scoping (`Gpo` and `GpoLink`)**: Employs Microsoft’s canonical `GroupPolicyDsc` modules enforcing physical Group Policy Objects bound directionally targeting discrete Organizational constraints (Baseline mappings to Root, Regional policies targeting Derby/Nottingham).
-7. **Advanced Security Matrices (`ADFineGrainedPasswordPolicy`)**: Wraps sophisticated Tier-0 complexities globally against administrative classes.
+Desired State Configuration is selected over traditional PowerShell scripting because it allows engineers to define the desired system state declaratively rather than writing imperative step-by-step scripts (Petty, Jones and Hicks, 2024). DSC makes the build more predictable, easier to maintain, and aligned with enterprise-grade Infrastructure-as-Code practices (Chaganti, 2018).
 
-### Generated Artefacts
-When the core canonical logic sequence (`Run_BuildMain.ps1`) actively negotiates the execution, it reliably aggregates the fundamental state fabric (`AllNodes.psd1`) seamlessly mapping parameters into the raw blueprint (`StudentConfig.ps1`). This action immediately translates into a single binary `.mof` compiled perfectly natively inside the `DSC\Outputs` localized directory block. This binary effectively contains compiled machine instructions driving the Local Configuration Manager engine loop. Following immediate deployment realization, every operational log generated by WMI parameters, explicit verbose execution configurations, Git extraction variables, and comprehensive `Invoke-Pester` validation outputs are exported as immutable forensic audit artefacts within the strict bounds of the `Evidence\` directory structure.
+DSC provides idempotency — after the first successful build, re-running the script produces no changes. DSC checks current state before applying changes, ensuring only missing or incorrect configurations are corrected. This is critical for reliable rebuilds and repeatable automation.
 
-### Credential Handling Integrity and Runbook Safety
-Operating exclusively within the context of a hyper-realistic academic implementation modeling cybersecurity environments, raw credential secrets are mathematically sanitized globally within the orchestrator script utilizing randomized symmetric hashing patterns explicitly shielding the final `.mof` architecture structure from containing dangerous parameters. Raw plaintext iteration directly stored across source repositories remains universally avoided—an oversight directly linked toward substantial historical supply chain disasters (e.g., SolarWinds, Capital One misconfigurations). To sustain unattended end-to-end operational viability natively handling required Active Directory restarts, the configuration dictates modifying the native node LCM operational flag `ActionAfterReboot = 'ContinueConfiguration'`, an integral capability that allows the orchestrator to reboot immediately completing AD deployment, autonomously resume the pipeline sequence silently during startup boundaries, and ultimately finalize execution without pausing for manual interference.
+The configuration logic is divided into nine chronological layers. Layer 0 prepares evidence directories. Layer 1 installs Windows features. Layer 2 promotes the domain using `ADDomain` and waits for availability via `WaitForADDomain`. Layers 3, 4, and 5 create OUs, groups, and users respectively, all dependent on a healthy domain. Layers 6 to 8 configure group memberships, GPOs, and FGPP. Layer 9 automatically collects evidence. This layered design ensures correct execution order and simplifies troubleshooting. The compiled MOF file is produced at `DSC\Outputs\StudentBaseline\localhost.mof` and PowerShell transcripts are stored in `Evidence\Transcripts\` (Siddaway, 2017).
+
+Reboots are handled automatically via the LCM settings `ActionAfterReboot = ContinueConfiguration` and `RebootNodeIfNeeded = $true`, allowing DC promotion to reboot the server and the pipeline to resume without manual intervention.
+
+Security hygiene requires passwords are never stored in plaintext in source control. Credentials are injected at runtime through `Run_BuildMain.ps1` as `PSCredential` objects — `DomainAdminCredential` and `DsrmCredential` are passed as parameters and never appear in committed files. In production these would be sourced from Azure Key Vault at pipeline execution time (Klaffenbach, Damaschke and Michalski, 2017).
+
+
 
 ## 4. Repository Structure
-The repository strictly conforms exactly to the requisite assignment parameters facilitating perfectly reliable grading operations preventing broken paths or incompatible file-discovery pipelines. Zero stray or untracked architectural artifacts guarantee flawless Continuous Integration/Continuous Deployment (CI/CD) behavior globally natively matching the intended payload limits.
 
-- `Documentation\`: Home to TurnItIn `.docx` document versions mapping direct academic submissions.
-- `DSC\Data\AllNodes.psd1`: The fundamental payload dictionary explicitly containing node mapping profiles, subnet data parameters, explicit domain DNS naming conventions (`DomainName`, `DomainNetBIOSName`), and explicit time-servers validating precise Kerberos validation windows.
-- `DSC\Configurations\StudentConfig.ps1`: The singular blueprint definition dynamically compiling node resources utilizing unrolled variables to prevent localized WMF 5.1 variable looping regressions.
-- `DSC\Outputs\`: Retains `.mof` compilations detailing explicit machine configuration data blocks securely wrapped across runtime cycles.
-- `Evidence\`: Deeply segmented structural directories securely harboring compilation `Transcripts`, detailed operational diagnostic streams across `Network\` directories, compiled NUnit `Pester` test XML endpoints, explicit AI logic templates nested within the `AI_LOG`, and massive unrolled extracts within `Git\Reflog` tracking granular developmental repository timestamps guaranteeing individual authorship origin mechanisms.
-- `README.md`: System runbook overarching guide providing an absolute macroscopic system validation trace.
-- `Scripts\`: Carries tutor-provided orchestrator mechanics safely bridging external DSC module repositories directly toward active pipeline components alongside WMI firewall exceptions.
-- `Tests\Pester`: Houses complex logical assertions defining both provided tutor AD mapping prerequisites and advanced exclusively crafted `Student.Tests.ps1` configurations targeting distinct organizational logic checks.
+The repository conforms exactly to the tutor-provided scaffold. Only two files are student-authored: `DSC\Configurations\StudentConfig.ps1` and `DSC\Data\AllNodes.psd1`. All scripts use repo-relative paths via `$PSScriptRoot`.
+
+`Run_BuildMain.ps1` is the single entry point. It loads configuration data, compiles DSC via Windows PowerShell 5.1, and applies the configuration. `DSC\Data\AllNodes.psd1` stores all environment data — IP addresses, domain names, OU paths, users, groups — separated from logic to maximise maintainability and scalability. `DSC\Configurations\StudentConfig.ps1` contains the full DSC logic for domain setup, OU creation, group and user provisioning, RBAC, GPO deployment, and FGPP.
+
+The `Tests\Pester\` folder contains tutor-provided test files (`ADDS_Promotion.Tests.ps1`, `Baseline.Tests.ps1`, `PreDCPromo.Tests.ps1`) and the student-authored test file (`Student.Tests.ps1`). The `Scripts\Prereqs\` folder contains tutor-provided one-shot scripts for LCM configuration and network setup, called automatically during Phase 1.
+
+```
+BarmBuzz/
+├── Run_BuildMain.ps1
+├── README.md
+├── DSC/
+│   ├── Configurations/StudentConfig.ps1
+│   ├── Data/AllNodes.psd1
+│   └── Outputs/StudentBaseline/localhost.mof
+├── Scripts/
+│   └── Prereqs/
+│       ├── BarmBuzz_OneShot_LCM.ps1
+│       └── BarmBuzz_OneShot_Network.ps1
+├── Tests/
+│   └── Pester/
+│       ├── Invoke-Validation.ps1
+│       └── Student.Tests.ps1
+└── Evidence/
+    ├── Transcripts/
+    ├── AD/
+    ├── GPOBackups/
+    ├── HealthChecks/
+    ├── Pester/
+    ├── Screenshots/
+    ├── Git/Reflog/
+    └── AI_LOG/AI-Usage.md
+```
+
 
 ## 5. Execution Order (Run Book)
-This comprehensive matrix is fundamentally stateless prior toward initialization spanning cleanly on newly snapshotted minimal Windows Server 2025 operating systems globally. The solution strictly demands an elevated contextual terminal instance natively targeting unmodified VM conditions rendering external modification steps invalid.
 
-### Operational Preconditions
-- The target virtual machine MUST be initialized possessing raw underlying networking pipelines configured correctly addressing an Internal/Host-Only Subnet interface explicitly to prevent external DHCP overlaps.
-- The fundamental administrator password variables utilized correctly mapping initial OS configuration vectors.
-- A functional Windows PowerShell version 7+ (pwsh) shell executed actively within explicit elevation requirements directly as the native local Machine Administrator preventing WinRM session rejections.
+### Preconditions
 
-### Step-by-Step Executable Run Sequence
-1. Locate the extracted project root directory. Open standard PowerShell 7 matching Admin privileges.
-2. Initialize absolute execution mechanisms directly running: `.\Run_BuildMain.ps1`
-3. **Phase 1 Configuration Handling**: The orchestrator immediately identifies localized validation flags parsing native prerequisites executing internal instances mapped alongside `Scripts\Helpers\Invoke-BarmBuzz-OneShots.ps1`. The script inherently enforces Public network firewalls translating seamlessly onto Private scopes, aggressively activating necessary `WinRM` transport tunnels enabling loopback DSC pipelines reliably matching WS-Management (Port 5985). This precisely secures required local configurations immediately mitigating DSC access rejection vectors.
-4. **Phase 2 Extractor Module Baseline (`PSResourceGet`)**: The underlying script queries global dependencies automatically, specifically downloading `ActiveDirectoryDsc` natively pulling explicit version (`v6.6.0`), and standardizing older module hierarchies connecting safely providing requisite `GroupPolicyDsc` commands.
-5. **Phase 3 Local Configuration Manager Modification**: Overwrites critical backend DSC meta-settings modifying explicit behavior variables generating `RebootNodeIfNeeded = $true` seamlessly.
-6. **Phase 4 Blueprint Compilation**: Synthesizing the static declarative constraints isolated from `AllNodes.psd1` tightly wrapping within the architectural directives configured strictly across `StudentConfig.ps1`. Resultant state parameters resolve successfully projecting explicit machine definitions output into a persistent memory cache located statically inside `DSC\Outputs\StudentBaseline\localhost.mof`.
-7. **Phase 5 AD DS Primary Synthesis**: Operating against isolated WMI instances, the LCM queries target conditions correctly initiating native Microsoft `ADDomain` structural directives triggering the underlying Server Manager APIs processing local `NTDS` installation prerequisites aggressively demanding immediate runtime reboot sequence processing protocols locally.
-8. **Phase 6 Automatic Reboot Orchestration & Continuation**: Leveraging `ActionAfterReboot = 'ContinueConfiguration'`, following internal system recycle, standard operating system loading protocols natively bypass external requirements silently resuming pending target directives seamlessly.
-9. **Phase 7 Organizational Payload Generation**: Fully autonomous initialization parameters connect against newly elevated Active Directory contexts correctly spinning explicit object hierarchies—generating unrolled AGDLP matrices, explicit organizational boundaries matching Derby hierarchies, mapping structural staff identity objects alongside distinct nested GPOs executing `GpoLink` boundaries flawlessly without generating sequence drift errors explicitly due towards highly enforced `DependsOn` conditions enforcing synchronization chains exactly matching root variables resolving dynamically.
-10. **Phase 8 Validation Verification Model (`Invoke-Validation.ps1`)**: Operating against finalized system architectures globally running explicitly testing all variables simultaneously extracting operational testing datasets evaluating perfectly correctly generated objects confirming ultimate operational validity checks.
+The Windows Server VM must be running on VirtualBox with a static IP of `192.168.56.10` on the host-only adapter (`Ethernet`) and a NAT adapter (`Ethernet 2`) for internet access. PowerShell 7 must be open as Administrator. No prior AD DS installation should exist.
+
+Clone the repository:
+
+```powershell
+git clone https://github.com/Studywithme-wq/BarmBuzz C:\BarmBuzz
+cd C:\BarmBuzz
+```
+
+### Step-by-Step Sequence
+
+**Step 1 — Run the orchestrator:**
+```powershell
+.\Run_BuildMain.ps1
+```
+Phase 1 configures LCM and network. Phase 2 compiles the MOF via Windows PowerShell 5.1 and begins AD DS installation.
+Verify: `Get-DscLocalConfigurationManager | Select-Object ActionAfterReboot, RebootNodeIfNeeded`
+
+**Step 2 — Automatic reboot:**
+The server reboots automatically for DC promotion. This is the only reboot point. Log back in as `Administrator / superw1n_user`. LCM resumes automatically — no manual intervention required.
+
+**Step 3 — Wait for LCM to complete:**
+```powershell
+Get-DscConfigurationStatus | Select-Object Status
+```
+Expected: Status shows `Success`.
+
+**Step 4 — Verify AD objects:**
+```powershell
+Get-ADDomain | Select-Object DNSRoot, NetBIOSName
+Get-ADOrganizationalUnit -Filter * | Select-Object Name, DistinguishedName
+Get-ADUser -Filter * | Select-Object SamAccountName, Enabled
+Get-ADGroup -Filter * | Select-Object Name, GroupScope
+Get-GPO -All | Select-Object DisplayName, GpoStatus
+Get-ADFineGrainedPasswordPolicy -Filter * | Select-Object Name, Precedence, MinPasswordLength
+```
+
+**Step 5 — Run Pester validation:**
+```powershell
+.\Tests\Pester\Invoke-Validation.ps1
+```
+Expected: 109+ tests passing. Results saved to `Evidence\Pester\PesterResults_*.xml`.
+
 
 ## 6. Idempotence and Re-run Behaviour
-One remarkably pronounced foundational tenet defining contemporary enterprise infrastructure scaling is explicitly defined through mathematical 'Idempotency'—a condition wherein an operational sequence execution safely evaluated multiple overlapping iterations natively without destroying or continuously reproducing existing outputs fundamentally breaking underlying system architectures beyond the intended initial creation parameters.
 
-### Interpreting Advanced "Good Rerun" Topographies
-If users operate `.\Run_BuildMain.ps1` concurrently generating secondary and tertiary processing iterations spanning perfectly established networks globally, the embedded Desired State Configuration engine mathematically validates persistent configurations mapping exact states originating directly from the `localhost.mof` parameter. By analyzing local state conditions through deep execution calls querying specific underlying variables matching actual AD configuration environments executing discrete internal evaluation API tests mapping `Get-TargetResource` natively against directory services, DSC rapidly realizes every explicit internal object parameter—Organizational Units, Nested Administrative GPOs, Role-Bound Endpoints—exists accurately securely conforming toward parameter thresholds exactly mapping structural parameters silently avoiding unnecessary object manipulations triggering perfectly empty state adjustments fundamentally shifting execution latencies safely downwards into absolute minimal validation cycles spanning seconds instead matching initial deep installation bounds parsing extensively against multiple minute barriers securely generating pristine validation logs verifying stability operations flawlessly conforming standard constraints explicitly targeting operational perfection endpoints generating no false modifications natively avoiding system drift fundamentally.
+### Re-Run Expectations
 
-### Mitigating Specific Initialization And Substrate Ordering Constraints
-Extensive and robust execution variables natively isolate critical dependency failures cleanly eliminating problematic logical paradox matrices manipulating structural definitions cleanly utilizing expansive `DependsOn` directives wrapping individually structured resources mapping strict sequencing chains eliminating cyclic execution faults reliably. For example, generating target users effectively utilizing `ADUser` strictly requires preceding AD boundaries initialized perfectly against container elements tracking `ADOrganizationalUnit` parameters accurately explicitly waiting securely tracking explicit synchronization requirements generated against isolated root variables enforcing precisely timed delays mapping AD DS initialization limits securely tracking `ADWaitForDomain` variables operating synchronously validating active listener ports globally enforcing exact operational sequencing structures parsing properly natively guaranteeing execution safety mechanisms globally.
+Running `.\Run_BuildMain.ps1` a second time yields no new configuration changes. The second build completes in under one minute, confirming the system is already in the desired state and proving the build process is repeatable and safe to re-run (Lee, 2023).
+
+The LCM compares current state against desired state before each resource. If they match, the `SetScript` is never called. This prevents duplication of AD objects (users, OUs, policies), protects against configuration drift, and ensures consistency across multiple executions.
+
+The `DependsOn` property enforces strict execution ordering. `WaitForADDomain` must complete before any AD object is created. Parent OUs must exist before child OUs. Groups must exist before memberships are assigned. FGPP depends on admin groups existing. These constraints prevent critical failures and ensure reliable orchestration (Chaganti, 2018).
+
+The only resource that always runs is the `CollectEvidence` script, which has `TestScript = { return $false }` intentionally, ensuring fresh evidence is captured on every run.
+
+### Evidence
+
+Proof of idempotency is provided by comparing `Evidence\Transcripts\[first_run]_Run_BuildMain.txt` with `Evidence\Transcripts\[second_run]_Run_BuildMain.txt`. The first run shows each DSC resource executing its `SetScript`. The second run shows every resource returning from `TestScript` without invoking `SetScript`, confirming zero configuration drift (Siddaway, 2017). The compiled MOF at `DSC\Outputs\StudentBaseline\localhost.mof` provides an inspectable record of the desired state.
+
+
 
 ## 7. Validation and Testing Model
-Sustaining persistent integrity configurations heavily relies navigating towards explicit quantitative operational data explicitly monitored across rigorously orchestrated behavioral environments generated precisely utilizing `Pester` test structures.
 
-### Systematic Interpretation Mechanisms & Evidence Vectors
-The fundamental execution parameter natively isolates specific validation sequences generated exactly by running parallel execution checks parsing target tests located explicitly inside `Tests\Pester`. Standard environments execute baseline execution scripts isolating internal service checks manipulating precise output definitions saving raw evaluation logs specifically tracking exact status mechanisms isolated globally natively stored directly traversing variables safely mapped precisely evaluating outputs located inside `Evidence\Pester`.
-A diagnostic validation pipeline checking precisely against specific failures—such as explicitly identifying exact exceptions tracking `DNS` endpoint resolution failures returning null IP strings when dynamically parsing variables testing internal `bolton.barmbuzz.test` hostnames actively identifies problematic domain registration pipelines tracking incorrect NIC alignments spanning incorrect Active Directory registration topologies explicitly isolating structural DNS namespace injection variables parsing invalid RSAT installation bounds perfectly mapping exact telemetry faults reliably connecting problematic origins effortlessly diagnosing issues effectively natively enabling exact configuration remediation adjustments tracking explicit module missing dependency structures seamlessly validating precise constraints isolating exact domain missing configurations safely navigating complicated fault mechanisms gracefully tracking accurate data variables securely reliably providing exact feedback explicitly. Custom definitions embedded actively addressing specific parameters validating advanced structural variables explicitly evaluating specifically isolated AGDLP instances mapping explicitly analyzing Advanced Tiered OUs monitoring actively capturing custom objects tracking custom FGPP values mapping properly executing `Student.Tests.ps1` variables tracking custom validation metrics effectively.
+### What Evidence Proves
+
+| Category | What is proved | Evidence |
+|---|---|---|
+| Domain health | AD DS, DNS, Netlogon, KDC running | `ADDS_Promotion.Tests`; `dcdiag_final.txt` |
+| OU structure | All 11 OUs at correct paths | `Student.Tests`; `OUs_final.csv` |
+| AGDLP groups | GG and DL groups with correct scope | `Student.Tests`; `Groups_final.csv` |
+| User placement | All 8 users in correct OUs | `Student.Tests`; `Users_final.csv` |
+| GPO existence | 4 GPOs linked to correct OUs | `Student.Tests`; `GPOList_*.txt` |
+| GPO application | Policy applied to DC | `gpresult_DC.txt` |
+| FGPP | PSO-Admins applied to admin groups | `FGPP_final.txt`; `Student.Tests` |
+| Idempotence | Second run has zero changes | Second run transcript |
+| Ubuntu join | Identity resolution working | `Evidence\Transcripts\Ubuntu_join.txt` |
+| Screenshots | Build milestones and AD state | `Evidence\Screenshots\` |
+
+The student-authored test file `Tests\Pester\Student.Tests.ps1` extends the tutor harness with additional assertions covering OU existence, AGDLP group scope, user placement, GPO linking, FGPP parameters, and domain service health — specifically targeting the A-grade and A* criteria.
+
+### How to Run Tests
+
+```powershell
+cd C:\BarmBuzz
+.\Tests\Pester\Invoke-Validation.ps1
+```
+
+Results are saved automatically to `Evidence\Pester\PesterResults_[timestamp].xml` in NUnit XML format.
+
+### Interpreting Failures
+
+If AD service tests fail, check `Evidence\HealthChecks\dcdiag_final.txt` for NTDS or DNS errors — most commonly caused by time synchronisation issues. If OU tests fail, verify the `DependsOn` chain and check `Evidence\DSC\*_apply_verbose.txt`. If GPO link tests fail, SYSVOL may not have been ready — re-running the build resolves this as GPO Script resources are idempotent. If FGPP tests fail, verify domain functional level using `Get-ADDomain | Select-Object DomainMode`.
+
+
 
 ## 8. Security Considerations
-- **Isolated Target Configurations Mapping Elevated Context Environments**: The explicitly defined `OU=BoltonAdmins` organizational structure strictly maps independent control environments actively isolating valuable identities protecting specific credentials completely separated targeting generic Active Directory containers explicitly preventing horizontal administrative mapping attacks actively mitigating compromised credential escalation mapping distinct lateral vulnerabilities inherently preventing dangerous administrative object exposure risks specifically natively explicitly matching zero-trust infrastructure environments isolating key constraints tracking explicit roles mapping effectively ensuring operational safety definitions.
-- **Advanced Identity Credential Restrictions (A* Evaluation Criteria)**: Standard Active Directory deployment matrices frequently deploy monolithic password configurations traversing singular domain architectures universally isolating singular structures generating complex configuration conflicts fundamentally frustrating normal network operators generating catastrophic localized password leakages (e.g., Post-It note passwords) tracking impossible complexity limits generating internal validation friction natively inherently producing massive support bottlenecks actively generating risk. Leveraging specifically crafted Fine-Grained Password Policies (`ADFineGrainedPasswordPolicy`) exactly isolated specifically mapping `GG-BoltonAdmins` variables strictly targeting sophisticated precedence arrays evaluating completely isolated 15 character structures executing extended lockout tracking constraints explicitly preventing excessive policy drift masking complex administrative vulnerabilities while simultaneously removing generic workforce authentication friction ensuring optimal organizational compliance matching exact tier-zero implementation architectures natively simulating complete enterprise structures perfectly generating exact isolated credentials safely executing properly.
-- **Credential Storage Mitigations & Cryptographic Analysis Mechanisms**: Explicit constraints restrict isolated target passwords dynamically avoiding plaintext source tracking preventing extensive supply-chain vulnerabilities effectively utilizing native orchestration variables tracking precise symmetric generation techniques executing properly mitigating advanced execution faults flawlessly ensuring precise execution bounds reliably bypassing problematic parameter leakage environments simulating enterprise `KeyVault` implementations actively demonstrating zero-trust infrastructure guidelines tracking advanced execution constraints properly guaranteeing pipeline execution variables seamlessly avoiding compromised parameters tracking precisely flawlessly validating professional methodology strictly executing correctly natively efficiently generating operational safety.
+
+### Credential Handling Trade-offs
+
+Fixed passwords are injected at runtime through `Run_BuildMain.ps1`. `PSDscAllowPlainTextPassword = $true` is set in `AllNodes.psd1` for this lab context. In a production environment, `PsDscAllowPlainTextPassword = $false` would be enforced with certificate-encrypted MOF files, and credentials would be sourced from Azure Key Vault at pipeline execution time (Klaffenbach, Damaschke and Michalski, 2017). This prevents any credential exposure in source control (Joint Task Force Interagency Working Group, 2020).
+
+### RBAC Rationale and Least Privilege
+
+The AGDLP model ensures no user holds direct resource permissions. Access is granted and revoked at the group level, aligning with NIST SP 800-53 AC-6 and reducing lateral movement risk (Das, 2024; Hicks, 2016).
+
+### GPO Security Justification
+
+| GPO | Risk | Control | Scope |
+|---|---|---|---|
+| BB-Baseline-Security | LLMNR poisoning (MITRE T1557.001); unlocked sessions | Disable LLMNR; screen lock after 600s | Bolton OU |
+| BB-Derby-Regional | USB exfiltration and malware introduction | Disable USBSTOR service (Start=4) | Derby OU |
+| BB-Admin-Hygiene | Pass-the-hash via admin on standard workstation (MITRE T1550.002) | Tier isolation flag; Enforced GPO link | BoltonAdmins OU |
+| BB-Nottingham-Ops | Configuration drift at sub-regional level | Registry baseline for Nottingham unit | Nottingham OU |
+
+### Fine-Grained Password Policy
+
+`PSO-Admins` applies a 16-character minimum password, 24-password history, 30-day maximum age, and 3-attempt lockout to `GG-IT-Admins` and `GG-Derby-IT-Admins` (Precedence 10). FGPP operates independently of the default domain password policy — it is applied directly to security groups via `Add-ADFineGrainedPasswordPolicySubject`, meaning standard users are entirely unaffected by the stricter requirements. Without FGPP, either end users face unnecessary complexity or privileged accounts receive insufficient policy strength. FGPP resolves this without creating a separate domain (Simos, 2023).
+
 
 ## 9. Evidence Mapping
-Mathematical validation variables natively isolate precise explicit logging constraints securely tracking explicit execution targets mapped precisely resolving output references properly executing strictly towards mapped environments mapping reliably correctly defining absolute operational provenance variables generating accurately explicitly tracking constraints mapping reliably explicitly exactly generating references correctly executing properly storing explicit artifacts explicitly validating evaluation bounds explicitly targeting generated directories correctly matching:
-- **Build Reproducibility/Idempotence**: `Evidence\Transcripts\*_Run_BuildMain.txt`
-- **Compiled Desired State Structure**: `DSC\Outputs\StudentBaseline\localhost.mof`
-- **Artificial Intelligence Orchestration Templates**: `Evidence\AI_LOG\AI-Usage.md`
-- **Identity Evaluation Source Code Logs**: `Evidence\Git\GitLog.txt` AND `Evidence\Git\Stats.txt`
-- **NUnit Encrypted Validation Bounds**: `Evidence\Pester\PesterResults_*.xml` (Generated explicitly following test completions analyzing specific local instances directly)
-- **Networking Configuration Logs**: `Evidence\Network\*_ipconfig.txt` and isolated variables ensuring proper local interfaces executing reliably verifying exact telemetry variables tracking properly accurately diagnosing issues flawlessly validating operations smoothly configuring bounds smoothly accurately generating logs exactly testing variables seamlessly smoothly efficiently guaranteeing proper test evaluations natively ensuring results cleanly accurately tracking execution perfectly seamlessly generating variables clearly guaranteeing constraints exactly smoothly seamlessly precisely properly thoroughly comprehensively rigorously definitively successfully thoroughly conclusively safely flawlessly.
 
-## 10. Known Limitations and reflections
-**Technical Infrastructure Operational Reflections**:
-While PowerShell Desired State Configuration natively executes brilliant immutable pipeline bounds generating phenomenal Infrastructure-as-Code ecosystem integrations accurately mimicking sophisticated pipeline templates natively actively mitigating monolithic scripting vectors natively executing flawlessly evaluating correctly... older embedded legacy components testing variables tracking specifically against Class-Based `GroupPolicyDsc` elements explicitly demand complex evaluation gymnastics forcing orchestrator scripts manipulating WMF 5.1 sub-processes manually bypassing strict WMF 7 execution parameters defining fundamental structural execution boundaries highlighting legacy architectural compatibility mismatches embedded directly tracking operating system components natively generating fundamental script execution workarounds executing specifically demonstrating older compatibility thresholds securely operating correctly.
-**Self Assessment & Qualitative Reflection Analysis**:
-Evaluating structural design implementations explicitly executed towards rigorous environmental benchmarks precisely validating operational mechanisms thoroughly executing exactly tracking advanced A* security controls smoothly mitigating standard generic deployment boundaries accurately generating exact single-domain isolation constraints exactly isolating administrative identity bounds securely utilizing isolated `FineGrainedPasswordPolicy` architectures aggressively navigating advanced environment deployments smoothly explicitly avoiding complex unnecessary Multi-Domain Trust Topologies generating artificial tracking vectors generating explicit execution risks directly mimicking modern enterprise `Zero Trust` standards actively separating logical identity boundaries completely preventing lateral vulnerabilities explicitly verifying operational mastery executing successfully executing successfully generating exactly properly natively explicitly satisfying exact evaluation limits flawlessly generating perfect assignment constraints thoroughly perfectly.
+| Claim | Evidence File |
+|---|---|
+| Domain `bolton.barmbuzz.test` created | `Evidence\Transcripts\*_Run_BuildMain.txt`; `dcdiag_final.txt` |
+| DC services running | `dcdiag_final.txt`; Pester `ADDS_Promotion` context |
+| All 11 OUs at correct paths | `Evidence\AD\OUs_final.csv`; `PesterResults_*.xml` |
+| All 8 users in correct OUs | `Evidence\AD\Users_final.csv`; Pester User Placement |
+| 10 groups with correct scope | `Evidence\AD\Groups_final.csv`; Pester AGDLP context |
+| AGDLP nesting GG in DL | `Groups_final.csv` Members column |
+| GPOs linked to correct OUs | `GPOList_*.txt`; `GPOLinks_Bolton.txt`; `GPOLinks_Derby.txt` |
+| GPO applies to DC | `Evidence\GPOBackups\gpresult_DC.txt` |
+| PSO-Admins FGPP with 16-char minimum | `FGPP_final.txt`; `FGPP_Subjects_final.txt`; Pester FGPP |
+| Second run idempotent | Second run transcript in `Evidence\Transcripts\` |
+| 109 Pester tests passing | `Evidence\Pester\PesterResults_*.xml` |
+| DSC compiled MOF | `DSC\Outputs\StudentBaseline\localhost.mof` |
+| Ubuntu identity resolution | `Evidence\Transcripts\Ubuntu_join.txt` |
+| Screenshots of build milestones | `Evidence\Screenshots\` |
+| Git development history | `Evidence\Git\GitLog.txt`; `reflog_DC01.txt` |
+| AI usage declared | `Evidence\AI_LOG\AI-Usage.md` |
+
+
+
+## 10. Limitations and Reflections
+
+The `PSDesiredStateConfiguration` module on this VM is version 2.0.8, but the tutor-pinned version is 2.0.7. This causes one Pester preflight test failure due to a version mismatch rather than any issue in the configuration or design. The DSC configuration is successfully applied and all functionality works as intended, as evidenced by the files in the Evidence folder.
+
+The GPO Script resources check only for GPO existence, not whether registry values or links are correctly configured. In a production environment, GPO settings would be compared against a known-good backup using `Get-GPOReport` and XML diffing to provide true idempotency for GPO content.
+
+The `GroupMemberships` Script resource uses a `TestScript` that only checks whether `j.smith` is a member of `GG-IT-Staff`. If any other membership is absent, the test still returns true. A production-grade implementation would verify all thirteen membership assignments individually.
+
+Ubuntu SSSD integration was validated through `realm list` and `id user@domain` outputs. A complete production integration would additionally configure Kerberos ticket renewal via `krb5_renewable_lifetime` in `sssd.conf` and validate SSH key-based authentication against AD credentials.
+
+### Self-Assessment
+
+This solution targets the A* Pathway 1 boundary. All requirements from Grade D through A are fully met: automated domain promotion, tiered OU structure, AGDLP group model, four OU-scoped GPOs with proven application, idempotence evidence, Ubuntu cross-platform authentication, and Fine-Grained Password Policy targeting privileged groups. The FGPP approach provides a stronger, more targeted security argument than a child domain, which is the core justification for Pathway 1 over Pathway 2. The primary limitations are the shallow GPO `TestScript` check and absence of full Kerberos validation on the Ubuntu client. Estimated grade: A (75%).
+
+
+## References
+
+Berkouwer, S. (2022) *Active Directory Administration Cookbook*, 2nd edn. Birmingham: Packt Publishing.
+
+Chaganti, R. (2018) *Pro PowerShell Desired State Configuration*, 2nd edn. New York: Apress.
+
+Das, R. (2024) *The Zero Trust Framework and Privileged Access Management (PAM)*, 1st edn. Boca Raton: CRC Press. doi: 10.1201/9781003470021.
+
+Hester, M. and Henley, C. (2013) *Microsoft Windows Server 2012 Administration: Instant Reference*. Indianapolis: Sybex.
+
+Hicks, R.M. (2016) *Implementing DirectAccess with Windows Server 2016*. New York: Apress.
+
+Joint Task Force Interagency Working Group (2020) *Security and Privacy Controls for Information Systems and Organizations*. Gaithersburg: National Institute of Standards and Technology. doi: 10.6028/NIST.SP.800-53r5.
+
+Klaffenbach, F., Damaschke, J.-H. and Michalski, O. (2017) *Implementing Azure Solutions*, 1st edn. Birmingham: Packt Publishing.
+
+Krause, J. (2023) *Mastering Windows Server 2022*, 4th edn. Birmingham: Packt Publishing.
+
+Lee, T. (2023) *Windows Server Automation with PowerShell Cookbook*, 5th edn. Birmingham: Packt Publishing.
+
+MITRE ATT&CK (2024a) *T1557.001 — LLMNR/NBT-NS Poisoning and SMB Relay*. Available at: https://attack.mitre.org/techniques/T1557/001/ (Accessed: 22 March 2026).
+
+MITRE ATT&CK (2024b) *T1550.002 — Pass the Hash*. Available at: https://attack.mitre.org/techniques/T1550/002/ (Accessed: 22 March 2026).
+
+Petty, J., Jones, D. and Hicks, J. (2024) *Learn PowerShell Scripting in a Month of Lunches*, 2nd edn. Shelter Island: Manning.
+
+Siddaway, R. (2017) *Learn PowerShell Desired State Configuration*. New York: Apress. ISBN: 978-1-4842-2059-7.
+
+Simos, M. (2023) *Zero Trust Overview and Playbook Introduction*, 1st edn. Birmingham: Packt Publishing.
+
+Smirnov, E. (2024) *Building Modern Active Directory*. New York: Apress.
